@@ -1,8 +1,8 @@
 #ifndef SKIPLIST_HA_SKIPLIST_H
 #define SKIPLIST_HA_SKIPLIST_H
 
-#include "handler.h"
-#include "my_global.h"
+#include "sql/handler.h"
+#include "my_inttypes.h"
 #include "thr_lock.h"
 #include "skiplist.h"
 

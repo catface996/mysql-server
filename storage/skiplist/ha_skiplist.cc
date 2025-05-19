@@ -1,16 +1,14 @@
 #include "ha_skiplist.h"
-#include "sql_class.h"
-#include "sql_plugin.h"
 #include "my_dbug.h"
 #include "mysql/plugin.h"
 #include "mysql/service_thd_alloc.h"
 #include "mysql/service_thd_wait.h"
 #include "mysql/service_mysql_alloc.h"
-#include "probes_mysql.h"
-#include "sql_plugin.h"
-#include "sql_table.h"
-#include "sql_base.h"
-#include "current_thd.h"
+#include "sql/sql_class.h"
+#include "sql/sql_plugin.h"
+#include "sql/sql_table.h"
+#include "sql/sql_base.h"
+#include "sql/current_thd.h"
 
 // 静态变量
 static handler *skiplist_create_handler(handlerton *hton, TABLE_SHARE *table,
@@ -324,14 +322,15 @@ mysql_declare_plugin(skiplist) {
     MYSQL_STORAGE_ENGINE_PLUGIN,
     &skiplist_storage_engine,
     "SKIPLIST",
-    "Author Name",
+    "Catface996",
     "Skip List Storage Engine",
     PLUGIN_LICENSE_GPL,
     skiplist_init_func,
     skiplist_deinit_func,
-    0x0100,
+    NULL,  // 版本信息
     NULL,
     NULL,
     NULL,
+    0,
     0
 } mysql_declare_plugin_end;
