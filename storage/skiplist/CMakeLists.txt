@@ -1,0 +1,16 @@
+# MySQL SkipList Storage Engine
+# Copyright (c) 2023 Author Name
+
+DISABLE_MISSING_PROFILE_WARNING()
+ADD_DEFINITIONS(-DMYSQL_SERVER)
+
+SET(SKIPLIST_SOURCES
+  ha_skiplist.cc
+  skiplist.cc
+)
+
+MYSQL_ADD_PLUGIN(skiplist ${SKIPLIST_SOURCES}
+  STORAGE_ENGINE
+  MODULE_ONLY
+  LINK_LIBRARIES ext::zlib
+)
