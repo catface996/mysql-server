@@ -3,8 +3,9 @@
 # 停止可能正在运行的MySQL进程
 ps aux | grep mysqld | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null
 
-# 切换到当前目录
-cd /Users/catface/Documents/code/GitHub/mysql-server
+# 切换到项目根目录
+cd "$(dirname "$0")/../../../"
+PROJECT_ROOT=$(pwd)
 
 # 确保日志目录存在
 mkdir -p logs
@@ -15,7 +16,7 @@ cat > /tmp/my.cnf << EOF
 default-storage-engine=SKIPLIST
 plugin-load-add=ha_skiplist.so
 port=3306
-log_error=/Users/catface/Documents/code/GitHub/mysql-server/logs/mysql_error.log
+log_error=${PROJECT_ROOT}/logs/mysql_error.log
 EOF
 
 # 启动MySQL服务器

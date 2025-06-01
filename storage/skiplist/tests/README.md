@@ -21,12 +21,20 @@
 
 ## 使用方法
 
-1. 启动MySQL服务器：
+1. 从测试目录启动MySQL服务器：
    ```
+   cd storage/skiplist/tests
    ./start_mysql_with_password.sh
    ```
 
 2. 运行测试脚本：
    ```
-   mysql -uroot -ppassword123 < test_skiplist.sql
+   cd storage/skiplist/tests
+   ../../../build/runtime_output_directory/mysql -uroot -ppassword123 < test_skiplist.sql
+   ```
+
+   或者从项目根目录：
+   ```
+   cd <项目根目录>
+   ./build/runtime_output_directory/mysql -uroot -ppassword123 < storage/skiplist/tests/test_skiplist.sql
    ```
