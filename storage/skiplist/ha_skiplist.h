@@ -20,6 +20,10 @@ public:
     const char *table_type() const override { return "SKIPLIST"; }
     ulonglong table_flags() const override;
     ulong index_flags(uint idx, uint part, bool all_parts) const override;
+    uint max_supported_keys() const override { return 1; }
+    uint max_supported_key_parts() const override { return 1; }
+    uint max_supported_key_length() const override { return MAX_KEY_LENGTH; }
+    uint max_supported_key_part_length(HA_CREATE_INFO *create_info) const override { return MAX_KEY_LENGTH; }
     
     // 表操作
     int create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,

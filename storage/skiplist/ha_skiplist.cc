@@ -62,7 +62,8 @@ ha_skiplist::~ha_skiplist() {
 // 表标志
 ulonglong ha_skiplist::table_flags() const {
     fprintf(stderr, "ha_skiplist::table_flags()\n");
-    return HA_NO_TRANSACTIONS | HA_NO_AUTO_INCREMENT | HA_PRIMARY_KEY_REQUIRED_FOR_POSITION | HA_PRIMARY_KEY_IN_READ_INDEX;
+    return HA_NO_TRANSACTIONS | HA_NO_AUTO_INCREMENT | HA_PRIMARY_KEY_REQUIRED_FOR_POSITION | 
+           HA_PRIMARY_KEY_IN_READ_INDEX | HA_CAN_INDEX_BLOBS;
 }
 
 // 索引标志
@@ -128,10 +129,31 @@ int ha_skiplist::create(const char *name, TABLE *form, HA_CREATE_INFO *create_in
     fprintf(stderr, "ha_skiplist::create(name=%s, form=%p, create_info=%p, table_def=%p)\n", 
             name, form, create_info, table_def);
     
+    // 设置表支持的键数量
+    if (form->s) {
+        form->s->keys_in_use.set_bit(0);  // 设置主键可用
+        form->s->keys = 1;                // 支持1个键（主键）
+        form->s->key_parts = 1;           // 每个键由1个部分组成
+    }
+    
     // 创建表结构
     SkipTable* table = create_table_structure(name);
     if (!table) {
         return HA_ERR_OUT_OF_MEM;
+    }
+    
+    // 处理主键
+    if (form->s->primary_key != MAX_KEY) {
+        KEY *key_info = &form->s->key_info[form->s->primary_key];
+        KEY_PART_INFO *key_part = key_info->key_part;
+        
+        // 设置主键索引信息
+        if (table->indexes && table->indexes[0]) {
+            table->indexes[0]->key_offset = key_part->offset;
+            table->indexes[0]->key_length = key_part->length;
+            fprintf(stderr, "Primary key: offset=%u, length=%u\n", 
+                    key_part->offset, key_part->length);
+        }
     }
     
     // 保存表结构到文件
@@ -160,6 +182,20 @@ int ha_skiplist::open(const char *name, int mode, uint test_if_locked,
         skip_table = create_table_structure(name);
         if (!skip_table) {
             return HA_ERR_CRASHED;
+        }
+    }
+    
+    // 处理主键
+    if (table->s->primary_key != MAX_KEY) {
+        KEY *key_info = &table->s->key_info[table->s->primary_key];
+        KEY_PART_INFO *key_part = key_info->key_part;
+        
+        // 设置主键索引信息
+        if (skip_table->indexes && skip_table->indexes[0]) {
+            skip_table->indexes[0]->key_offset = key_part->offset;
+            skip_table->indexes[0]->key_length = key_part->length;
+            fprintf(stderr, "Primary key: offset=%u, length=%u\n", 
+                    key_part->offset, key_part->length);
         }
     }
     
@@ -297,6 +333,13 @@ int ha_skiplist::info(uint flag) {
                            (ulong)(skip_table->data_size / skip_table->row_count) : 0;
     stats.delete_length = 0;
     stats.create_time = 0;
+    
+    // 设置支持的键数量
+    if (table_share) {
+        table_share->keys_in_use.set_bit(0);  // 设置主键可用
+        table_share->keys = 1;                // 支持1个键（主键）
+        table_share->key_parts = 1;           // 每个键由1个部分组成
+    }
     
     return 0;
 }
