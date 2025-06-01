@@ -47,7 +47,8 @@ mysql_declare_plugin(skiplist) {
 
 // 构造函数
 ha_skiplist::ha_skiplist(handlerton* hton, TABLE_SHARE* table_arg)
-    : handler(hton, table_arg), skip_table(nullptr), current_position(nullptr) {
+    : handler(hton, table_arg), skip_table(nullptr), current_position(nullptr),
+      active_index(0), active_index_ptr(nullptr) {
     fprintf(stderr, "ha_skiplist::ha_skiplist(hton=%p, table_arg=%p)\n", hton, table_arg);
     thr_lock_init(&lock);
 }
@@ -61,23 +62,61 @@ ha_skiplist::~ha_skiplist() {
 // 表标志
 ulonglong ha_skiplist::table_flags() const {
     fprintf(stderr, "ha_skiplist::table_flags()\n");
-    return HA_NO_TRANSACTIONS | HA_NO_AUTO_INCREMENT;
+    return HA_NO_TRANSACTIONS | HA_NO_AUTO_INCREMENT | HA_PRIMARY_KEY_REQUIRED_FOR_POSITION | HA_PRIMARY_KEY_IN_READ_INDEX;
 }
 
 // 索引标志
-ulong ha_skiplist::index_flags(uint, uint, bool) const {
-    return 0;
+ulong ha_skiplist::index_flags(uint idx, uint part, bool all_parts) const {
+    return HA_READ_NEXT | HA_READ_RANGE | HA_READ_AFTER_KEY | HA_KEYREAD_ONLY;
 }
 
 // 创建表结构
 SkipTable* ha_skiplist::create_table_structure(const char* name) {
     SkipTable* table = skiptable_create(name);
+    
+    // 创建主键索引
+    if (table) {
+        table->index_count = 1;  // 只有主键索引
+        table->indexes = (SkipListIndex**)malloc(sizeof(SkipListIndex*));
+        if (!table->indexes) {
+            skiptable_destroy(table);
+            return nullptr;
+        }
+        
+        // 主键索引与主列表相同
+        table->indexes[0] = skiplist_index_create("PRIMARY", INDEX_TYPE_PRIMARY, 0, 0);
+        if (!table->indexes[0]) {
+            free(table->indexes);
+            skiptable_destroy(table);
+            return nullptr;
+        }
+        
+        // 设置主键索引的列表为主列表
+        skiplist_destroy(table->indexes[0]->list);
+        table->indexes[0]->list = table->primary_list;
+    }
+    
     return table;
 }
 
 // 释放表结构
 void ha_skiplist::free_table_structure(SkipTable* table_ptr) {
     if (table_ptr) {
+        // 释放索引
+        if (table_ptr->indexes) {
+            for (uint32_t i = 0; i < table_ptr->index_count; i++) {
+                if (table_ptr->indexes[i]) {
+                    // 对于主键索引，不要释放列表，因为它与主列表相同
+                    if (table_ptr->indexes[i]->index_type == INDEX_TYPE_PRIMARY) {
+                        table_ptr->indexes[i]->list = nullptr;
+                    }
+                    skiplist_index_destroy(table_ptr->indexes[i]);
+                }
+            }
+            free(table_ptr->indexes);
+            table_ptr->indexes = nullptr;
+        }
+        
         skiptable_destroy(table_ptr);
     }
 }
@@ -410,4 +449,175 @@ THR_LOCK_DATA **ha_skiplist::store_lock(THD*, THR_LOCK_DATA **to,
     }
     *to++ = &lock_data;
     return to;
+}
+
+// 初始化索引
+int ha_skiplist::index_init(uint idx, bool sorted) {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_init(idx=%u, sorted=%d)\n", idx, sorted);
+    
+    if (!skip_table) {
+        return HA_ERR_CRASHED;
+    }
+    
+    // 检查索引是否有效
+    if (idx >= skip_table->index_count) {
+        return HA_ERR_WRONG_INDEX;
+    }
+    
+    // 设置当前活动索引
+    active_index = idx;
+    active_index_ptr = skip_table->indexes[idx];
+    
+    return 0;
+}
+
+// 结束索引
+int ha_skiplist::index_end() {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_end()\n");
+    
+    // 重置当前活动索引
+    active_index = 0;
+    active_index_ptr = nullptr;
+    
+    return 0;
+}
+
+// 通过索引读取记录
+int ha_skiplist::index_read_map(uchar *buf, const uchar *key, key_part_map keypart_map, 
+                               enum ha_rkey_function find_flag) {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_read_map(buf=%p, key=%p, keypart_map=%lu, find_flag=%d)\n", 
+            buf, key, keypart_map, find_flag);
+    
+    if (!skip_table || !active_index_ptr) {
+        return HA_ERR_CRASHED;
+    }
+    
+    // 获取键长度
+    uint key_length = active_index_ptr->key_length;
+    
+    // 根据查找标志执行不同的操作
+    SkipListNode* node = nullptr;
+    
+    switch (find_flag) {
+        case HA_READ_KEY_EXACT:
+            // 精确匹配
+            node = skiplist_index_search(active_index_ptr, key, key_length);
+            break;
+            
+        case HA_READ_KEY_OR_NEXT:
+            // 精确匹配或下一个
+            node = skiplist_index_search(active_index_ptr, key, key_length);
+            if (!node) {
+                // 找不到精确匹配，找下一个
+                SkipListNode* current = active_index_ptr->list->header;
+                for (int i = active_index_ptr->list->level - 1; i >= 0; i--) {
+                    while (current->forward[i] && 
+                           memcmp(current->forward[i]->data + active_index_ptr->key_offset, key, key_length) < 0) {
+                        current = current->forward[i];
+                    }
+                }
+                node = current->forward[0];
+            }
+            break;
+            
+        case HA_READ_AFTER_KEY:
+            // 找下一个
+            {
+                SkipListNode* current = active_index_ptr->list->header;
+                for (int i = active_index_ptr->list->level - 1; i >= 0; i--) {
+                    while (current->forward[i] && 
+                           memcmp(current->forward[i]->data + active_index_ptr->key_offset, key, key_length) <= 0) {
+                        current = current->forward[i];
+                    }
+                }
+                node = current->forward[0];
+            }
+            break;
+            
+        default:
+            return HA_ERR_UNSUPPORTED;
+    }
+    
+    if (!node) {
+        return HA_ERR_KEY_NOT_FOUND;
+    }
+    
+    // 更新当前位置
+    current_position = node;
+    
+    // 复制数据到缓冲区
+    memcpy(buf, node->data, node->data_length);
+    
+    return 0;
+}
+
+// 获取下一个索引记录
+int ha_skiplist::index_next(uchar *buf) {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_next(buf=%p)\n", buf);
+    
+    if (!skip_table || !active_index_ptr || !current_position) {
+        return HA_ERR_CRASHED;
+    }
+    
+    // 获取下一个节点
+    SkipListNode* node = current_position->forward[0];
+    
+    if (!node) {
+        return HA_ERR_END_OF_FILE;
+    }
+    
+    // 更新当前位置
+    current_position = node;
+    
+    // 复制数据到缓冲区
+    memcpy(buf, node->data, node->data_length);
+    
+    return 0;
+}
+
+// 获取前一个索引记录
+int ha_skiplist::index_prev(uchar *buf) {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_prev(buf=%p)\n", buf);
+    
+    // 跳表不支持高效的向前遍历，返回不支持
+    return HA_ERR_UNSUPPORTED;
+}
+
+// 获取第一个索引记录
+int ha_skiplist::index_first(uchar *buf) {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_first(buf=%p)\n", buf);
+    
+    if (!skip_table || !active_index_ptr) {
+        return HA_ERR_CRASHED;
+    }
+    
+    // 获取第一个节点
+    SkipListNode* node = active_index_ptr->list->header->forward[0];
+    
+    if (!node) {
+        return HA_ERR_END_OF_FILE;
+    }
+    
+    // 更新当前位置
+    current_position = node;
+    
+    // 复制数据到缓冲区
+    memcpy(buf, node->data, node->data_length);
+    
+    return 0;
+}
+
+// 获取最后一个索引记录
+int ha_skiplist::index_last(uchar *buf) {
+    DBUG_TRACE;
+    fprintf(stderr, "ha_skiplist::index_last(buf=%p)\n", buf);
+    
+    // 跳表不支持高效的获取最后一个记录，返回不支持
+    return HA_ERR_UNSUPPORTED;
 }

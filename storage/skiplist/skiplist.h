@@ -13,6 +13,10 @@
 #define LOG_OP_DELETE 2
 #define LOG_OP_UPDATE 3
 
+// 索引类型
+#define INDEX_TYPE_PRIMARY 1
+#define INDEX_TYPE_SECONDARY 2
+
 // 跳表节点结构
 struct SkipListNode {
     uchar* data;           // 行数据
@@ -29,7 +33,16 @@ struct SkipList {
     uint32_t max_level;    // 最大允许层级
 };
 
-// 表结构 - 简化版，移除二级索引
+// 索引结构
+struct SkipListIndex {
+    uint32_t index_type;     // 索引类型
+    uint32_t key_offset;     // 键在记录中的偏移量
+    uint32_t key_length;     // 键长度
+    SkipList* list;          // 索引列表
+    char* name;              // 索引名称
+};
+
+// 表结构
 struct SkipTable {
     SkipList* primary_list;  // 主列表
     char* table_name;        // 表名
@@ -37,6 +50,10 @@ struct SkipTable {
     uint64_t data_size;      // 数据总大小
     char* data_file_path;    // 数据文件路径
     char* log_file_path;     // 日志文件路径
+    
+    // 索引相关字段
+    uint32_t index_count;    // 索引数量
+    SkipListIndex** indexes; // 索引数组
 };
 
 // 日志记录结构
@@ -62,5 +79,12 @@ SkipTable* skiptable_load(const char* path);
 // 日志操作函数声明
 int log_write(SkipTable* table, uint32_t op_type, const uchar* data, uint32_t data_len);
 int log_recover(SkipTable* table);
+
+// 索引操作函数声明
+SkipListIndex* skiplist_index_create(const char* name, uint32_t type, uint32_t key_offset, uint32_t key_length);
+void skiplist_index_destroy(SkipListIndex* index);
+int skiplist_index_insert(SkipListIndex* index, const uchar* record, uint32_t record_length);
+int skiplist_index_delete(SkipListIndex* index, const uchar* record, uint32_t record_length);
+SkipListNode* skiplist_index_search(SkipListIndex* index, const uchar* key, uint32_t key_length);
 
 #endif // SKIPLIST_SKIPLIST_H

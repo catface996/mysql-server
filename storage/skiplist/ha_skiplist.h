@@ -35,6 +35,16 @@ public:
     int rnd_pos(uchar *buf, uchar *pos) override;
     void position(const uchar *record) override;
     
+    // 索引操作
+    int index_init(uint idx, bool sorted) override;
+    int index_end() override;
+    int index_read_map(uchar *buf, const uchar *key, key_part_map keypart_map, 
+                      enum ha_rkey_function find_flag) override;
+    int index_next(uchar *buf) override;
+    int index_prev(uchar *buf) override;
+    int index_first(uchar *buf) override;
+    int index_last(uchar *buf) override;
+    
     // 行操作
     int write_row(uchar *buf) override;
     int update_row(const uchar *old_data, uchar *new_data) override;
@@ -57,6 +67,10 @@ private:
     SkipListNode *current_position;
     THR_LOCK lock;
     THR_LOCK_DATA lock_data;
+    
+    // 索引相关成员变量
+    uint active_index;       // 当前活动索引
+    SkipListIndex* active_index_ptr; // 当前活动索引指针
 };
 
 #endif // SKIPLIST_HA_SKIPLIST_H
