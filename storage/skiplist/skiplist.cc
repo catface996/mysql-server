@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 // 随机层级生成函数
 static uint32_t random_level(uint32_t max_level) {
@@ -179,13 +183,7 @@ int skiplist_insert(SkipList* list, uchar* data, uint data_len) {
     }
     
     // 复制数据
-    new_node->data = (uchar*)malloc(data_len);
-    if (!new_node->data) {
-        free(new_node->forward);
-        free(new_node);
-        return -1;
-    }
-    memcpy(new_node->data, data, data_len);
+    new_node->data = data;  // 直接使用传入的数据，不再复制
     
     // 更新指针
     for (uint32_t i = 0; i < new_level; i++) {
@@ -286,6 +284,27 @@ SkipTable* skiptable_create(const char* name) {
     table->row_count = 0;
     table->data_size = 0;
     
+    // 设置数据文件路径
+    table->data_file_path = (char*)malloc(name_len + 5);  // +5 for ".skl"
+    if (!table->data_file_path) {
+        skiplist_destroy(table->primary_list);
+        free(table->table_name);
+        free(table);
+        return nullptr;
+    }
+    sprintf(table->data_file_path, "%s.skl", name);
+    
+    // 设置日志文件路径
+    table->log_file_path = (char*)malloc(name_len + 5);  // +5 for ".log"
+    if (!table->log_file_path) {
+        free(table->data_file_path);
+        skiplist_destroy(table->primary_list);
+        free(table->table_name);
+        free(table);
+        return nullptr;
+    }
+    sprintf(table->log_file_path, "%s.log", name);
+    
     return table;
 }
 
@@ -307,6 +326,361 @@ void skiptable_destroy(SkipTable* table) {
         table->table_name = nullptr;
     }
     
+    // 释放文件路径
+    if (table->data_file_path) {
+        free(table->data_file_path);
+        table->data_file_path = nullptr;
+    }
+    
+    if (table->log_file_path) {
+        free(table->log_file_path);
+        table->log_file_path = nullptr;
+    }
+    
     // 释放表结构
     free(table);
+}
+
+// 保存表结构到文件
+int skiptable_save(SkipTable* table, const char* path) {
+    fprintf(stderr, "skiptable_save(table=%p, path=%s)\n", table, path);
+    
+    if (!table || !path) return -1;
+    
+    // 创建目录（如果不存在）
+    char dir_path[MAX_PATH_LEN];
+    if (strlen(path) >= MAX_PATH_LEN) {
+        fprintf(stderr, "Path too long: %s\n", path);
+        return -1;
+    }
+    
+    strcpy(dir_path, path);
+    char* last_slash = strrchr(dir_path, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+        // 创建目录
+        int ret = mkdir(dir_path, 0777);
+        if (ret != 0 && errno != EEXIST) {
+            fprintf(stderr, "Failed to create directory: %s, errno: %d\n", dir_path, errno);
+            return -1;
+        }
+    }
+    
+    FILE* file = fopen(path, "wb");
+    if (!file) {
+        fprintf(stderr, "Failed to open file: %s, errno: %d\n", path, errno);
+        return -1;
+    }
+    
+    // 写入文件头
+    uint32_t magic = 0x534B4C54; // "SKLT"
+    uint32_t version = 1;
+    uint32_t name_len = 0;
+    
+    if (table->table_name) {
+        name_len = strlen(table->table_name);
+    }
+    
+    if (fwrite(&magic, sizeof(magic), 1, file) != 1 ||
+        fwrite(&version, sizeof(version), 1, file) != 1 ||
+        fwrite(&name_len, sizeof(name_len), 1, file) != 1) {
+        fprintf(stderr, "Failed to write file header\n");
+        fclose(file);
+        return -1;
+    }
+    
+    if (name_len > 0 && table->table_name) {
+        if (fwrite(table->table_name, name_len, 1, file) != 1) {
+            fprintf(stderr, "Failed to write table name\n");
+            fclose(file);
+            return -1;
+        }
+    }
+    
+    if (fwrite(&table->row_count, sizeof(table->row_count), 1, file) != 1 ||
+        fwrite(&table->data_size, sizeof(table->data_size), 1, file) != 1) {
+        fprintf(stderr, "Failed to write table info\n");
+        fclose(file);
+        return -1;
+    }
+    
+    // 写入主键索引信息
+    uint32_t primary_list_size = 0;
+    uint32_t primary_list_level = 0;
+    
+    if (table->primary_list) {
+        primary_list_size = table->primary_list->size;
+        primary_list_level = table->primary_list->level;
+    }
+    
+    if (fwrite(&primary_list_size, sizeof(primary_list_size), 1, file) != 1 ||
+        fwrite(&primary_list_level, sizeof(primary_list_level), 1, file) != 1) {
+        fprintf(stderr, "Failed to write primary list info\n");
+        fclose(file);
+        return -1;
+    }
+    
+    // 写入主键索引节点
+    if (table->primary_list && table->primary_list->header && table->primary_list->header->forward) {
+        SkipListNode* current = table->primary_list->header->forward[0];
+        while (current) {
+            if (fwrite(&current->data_length, sizeof(current->data_length), 1, file) != 1) {
+                fprintf(stderr, "Failed to write node data length\n");
+                fclose(file);
+                return -1;
+            }
+            
+            if (current->data && current->data_length > 0) {
+                if (fwrite(current->data, current->data_length, 1, file) != 1) {
+                    fprintf(stderr, "Failed to write node data\n");
+                    fclose(file);
+                    return -1;
+                }
+            }
+            current = current->forward[0];
+        }
+    }
+    
+    fclose(file);
+    return 0;
+}
+
+// 从文件加载表结构
+SkipTable* skiptable_load(const char* path) {
+    fprintf(stderr, "skiptable_load(path=%s)\n", path);
+    
+    if (!path) return nullptr;
+    
+    FILE* file = fopen(path, "rb");
+    if (!file) {
+        fprintf(stderr, "Failed to open file: %s, errno: %d\n", path, errno);
+        return nullptr;
+    }
+    
+    // 读取文件头
+    uint32_t magic, version, name_len;
+    if (fread(&magic, sizeof(magic), 1, file) != 1 ||
+        fread(&version, sizeof(version), 1, file) != 1 ||
+        fread(&name_len, sizeof(name_len), 1, file) != 1) {
+        fprintf(stderr, "Failed to read file header\n");
+        fclose(file);
+        return nullptr;
+    }
+    
+    if (magic != 0x534B4C54) {  // "SKLT"
+        fprintf(stderr, "Invalid file format\n");
+        fclose(file);
+        return nullptr;
+    }
+    
+    // 读取表名
+    char* table_name = nullptr;
+    if (name_len > 0) {
+        table_name = (char*)malloc(name_len + 1);
+        if (!table_name) {
+            fprintf(stderr, "Failed to allocate memory for table name\n");
+            fclose(file);
+            return nullptr;
+        }
+        
+        if (fread(table_name, name_len, 1, file) != 1) {
+            fprintf(stderr, "Failed to read table name\n");
+            free(table_name);
+            fclose(file);
+            return nullptr;
+        }
+        
+        table_name[name_len] = '\0';
+    }
+    
+    // 创建表结构
+    SkipTable* table = skiptable_create(table_name ? table_name : path);
+    if (!table) {
+        fprintf(stderr, "Failed to create table structure\n");
+        if (table_name) free(table_name);
+        fclose(file);
+        return nullptr;
+    }
+    
+    if (table_name) free(table_name);
+    
+    // 读取表信息
+    if (fread(&table->row_count, sizeof(table->row_count), 1, file) != 1 ||
+        fread(&table->data_size, sizeof(table->data_size), 1, file) != 1) {
+        fprintf(stderr, "Failed to read table info\n");
+        skiptable_destroy(table);
+        fclose(file);
+        return nullptr;
+    }
+    
+    // 读取主键索引信息
+    uint32_t primary_list_size, primary_list_level;
+    if (fread(&primary_list_size, sizeof(primary_list_size), 1, file) != 1 ||
+        fread(&primary_list_level, sizeof(primary_list_level), 1, file) != 1) {
+        fprintf(stderr, "Failed to read primary list info\n");
+        skiptable_destroy(table);
+        fclose(file);
+        return nullptr;
+    }
+    
+    // 读取主键索引节点
+    for (uint32_t i = 0; i < primary_list_size; i++) {
+        uint32_t data_length;
+        if (fread(&data_length, sizeof(data_length), 1, file) != 1) {
+            fprintf(stderr, "Failed to read node data length\n");
+            skiptable_destroy(table);
+            fclose(file);
+            return nullptr;
+        }
+        
+        uchar* data = (uchar*)malloc(data_length);
+        if (!data) {
+            fprintf(stderr, "Failed to allocate memory for node data\n");
+            skiptable_destroy(table);
+            fclose(file);
+            return nullptr;
+        }
+        
+        if (fread(data, data_length, 1, file) != 1) {
+            fprintf(stderr, "Failed to read node data\n");
+            free(data);
+            skiptable_destroy(table);
+            fclose(file);
+            return nullptr;
+        }
+        
+        // 插入到主键索引
+        if (skiplist_insert(table->primary_list, data, data_length) != 0) {
+            fprintf(stderr, "Failed to insert node data\n");
+            free(data);
+            skiptable_destroy(table);
+            fclose(file);
+            return nullptr;
+        }
+    }
+    
+    fclose(file);
+    
+    // 恢复日志
+    log_recover(table);
+    
+    return table;
+}
+
+// 写入日志
+int log_write(SkipTable* table, uint32_t op_type, const uchar* data, uint32_t data_len) {
+    if (!table || !table->log_file_path || !data || data_len == 0) {
+        return -1;
+    }
+    
+    // 打开日志文件
+    int fd = open(table->log_file_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if (fd < 0) {
+        fprintf(stderr, "Failed to open log file: %s, errno: %d\n", table->log_file_path, errno);
+        return -1;
+    }
+    
+    // 写入日志头
+    uint32_t log_size = sizeof(LogRecord) + data_len;
+    LogRecord* log_record = (LogRecord*)malloc(log_size);
+    if (!log_record) {
+        close(fd);
+        return -1;
+    }
+    
+    log_record->op_type = op_type;
+    log_record->data_length = data_len;
+    memcpy(log_record->data, data, data_len);
+    
+    // 写入日志记录
+    ssize_t written = write(fd, log_record, log_size);
+    free(log_record);
+    
+    if (written != log_size) {
+        fprintf(stderr, "Failed to write log record, written=%zd, expected=%u\n", written, log_size);
+        close(fd);
+        return -1;
+    }
+    
+    // 刷新到磁盘
+    fsync(fd);
+    close(fd);
+    
+    return 0;
+}
+
+// 恢复日志
+int log_recover(SkipTable* table) {
+    if (!table || !table->log_file_path) {
+        return -1;
+    }
+    
+    // 打开日志文件
+    int fd = open(table->log_file_path, O_RDONLY);
+    if (fd < 0) {
+        if (errno == ENOENT) {
+            // 日志文件不存在，不需要恢复
+            return 0;
+        }
+        fprintf(stderr, "Failed to open log file: %s, errno: %d\n", table->log_file_path, errno);
+        return -1;
+    }
+    
+    // 读取日志记录
+    LogRecord log_header;
+    ssize_t bytes_read;
+    
+    while ((bytes_read = read(fd, &log_header, sizeof(LogRecord))) == sizeof(LogRecord)) {
+        // 读取日志数据
+        uchar* data = (uchar*)malloc(log_header.data_length);
+        if (!data) {
+            close(fd);
+            return -1;
+        }
+        
+        if (read(fd, data, log_header.data_length) != log_header.data_length) {
+            fprintf(stderr, "Failed to read log data\n");
+            free(data);
+            close(fd);
+            return -1;
+        }
+        
+        // 根据操作类型执行相应的操作
+        switch (log_header.op_type) {
+            case LOG_OP_INSERT:
+                skiplist_insert(table->primary_list, data, log_header.data_length);
+                table->row_count++;
+                table->data_size += log_header.data_length;
+                break;
+                
+            case LOG_OP_DELETE:
+                skiplist_delete(table->primary_list, data, log_header.data_length);
+                if (table->row_count > 0) table->row_count--;
+                if (table->data_size >= log_header.data_length) {
+                    table->data_size -= log_header.data_length;
+                }
+                free(data);  // 删除操作需要释放数据
+                break;
+                
+            case LOG_OP_UPDATE:
+                // 更新操作需要额外的信息，这里简化处理
+                free(data);
+                break;
+                
+            default:
+                fprintf(stderr, "Unknown log operation type: %u\n", log_header.op_type);
+                free(data);
+                break;
+        }
+    }
+    
+    close(fd);
+    
+    // 清空日志文件
+    fd = open(table->log_file_path, O_WRONLY | O_TRUNC);
+    if (fd >= 0) {
+        close(fd);
+    }
+    
+    return 0;
 }

@@ -8,6 +8,11 @@
 #define MAX_SKIPLIST_LEVEL 16
 #define MAX_PATH_LEN 1024
 
+// 日志操作类型
+#define LOG_OP_INSERT 1
+#define LOG_OP_DELETE 2
+#define LOG_OP_UPDATE 3
+
 // 跳表节点结构
 struct SkipListNode {
     uchar* data;           // 行数据
@@ -30,6 +35,15 @@ struct SkipTable {
     char* table_name;        // 表名
     uint32_t row_count;      // 行数
     uint64_t data_size;      // 数据总大小
+    char* data_file_path;    // 数据文件路径
+    char* log_file_path;     // 日志文件路径
+};
+
+// 日志记录结构
+struct LogRecord {
+    uint32_t op_type;        // 操作类型
+    uint32_t data_length;    // 数据长度
+    uchar data[];            // 数据内容（变长）
 };
 
 // 跳表操作函数声明
@@ -42,5 +56,11 @@ int skiplist_delete(SkipList* list, const uchar* key, uint key_len);
 // 表操作函数声明
 SkipTable* skiptable_create(const char* name);
 void skiptable_destroy(SkipTable* table);
+int skiptable_save(SkipTable* table, const char* path);
+SkipTable* skiptable_load(const char* path);
+
+// 日志操作函数声明
+int log_write(SkipTable* table, uint32_t op_type, const uchar* data, uint32_t data_len);
+int log_recover(SkipTable* table);
 
 #endif // SKIPLIST_SKIPLIST_H

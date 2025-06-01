@@ -95,10 +95,13 @@ int ha_skiplist::create(const char *name, TABLE *form, HA_CREATE_INFO *create_in
         return HA_ERR_OUT_OF_MEM;
     }
     
-    // 释放表结构 - 简化版本，不保存表结构
+    // 保存表结构到文件
+    int result = skiptable_save(table, table->data_file_path);
+    
+    // 释放表结构
     free_table_structure(table);
     
-    return 0;
+    return result ? HA_ERR_CRASHED : 0;
 }
 
 // 打开表
@@ -108,10 +111,17 @@ int ha_skiplist::open(const char *name, int mode, uint test_if_locked,
     fprintf(stderr, "ha_skiplist::open(name=%s, mode=%d, test_if_locked=%u, table_def=%p)\n", 
             name, mode, test_if_locked, table_def);
     
-    // 创建表结构 - 简化版本，不加载表结构
-    skip_table = create_table_structure(name);
+    // 从文件加载表结构
+    char data_file_path[MAX_PATH_LEN];
+    snprintf(data_file_path, MAX_PATH_LEN, "%s.skl", name);
+    
+    skip_table = skiptable_load(data_file_path);
     if (!skip_table) {
-        return HA_ERR_CRASHED;
+        // 如果加载失败，创建新的表结构
+        skip_table = create_table_structure(name);
+        if (!skip_table) {
+            return HA_ERR_CRASHED;
+        }
     }
     
     // 初始化锁数据
@@ -125,8 +135,9 @@ int ha_skiplist::close(void) {
     DBUG_TRACE;
     fprintf(stderr, "ha_skiplist::close()\n");
     
-    // 释放表结构
+    // 保存表结构到文件
     if (skip_table) {
+        skiptable_save(skip_table, skip_table->data_file_path);
         free_table_structure(skip_table);
         skip_table = nullptr;
     }
@@ -261,6 +272,9 @@ int ha_skiplist::write_row(uchar *buf) {
     }
     memcpy(data_copy, buf, table->s->rec_buff_length);
     
+    // 写入日志
+    log_write(skip_table, LOG_OP_INSERT, data_copy, table->s->rec_buff_length);
+    
     // 插入到主列表
     int result = skiplist_insert(skip_table->primary_list, data_copy, table->s->rec_buff_length);
     if (result != 0) {
@@ -280,6 +294,10 @@ int ha_skiplist::update_row(const uchar *old_data, uchar *new_data) {
     DBUG_TRACE;
     fprintf(stderr, "ha_skiplist::update_row(old_data=%p, new_data=%p)\n", old_data, new_data);
     
+    // 写入日志 - 更新操作可以看作是删除+插入
+    log_write(skip_table, LOG_OP_DELETE, old_data, table->s->rec_buff_length);
+    log_write(skip_table, LOG_OP_INSERT, new_data, table->s->rec_buff_length);
+    
     // 简化版本，先删除旧行，再插入新行
     int result = delete_row(old_data);
     if (result != 0) {
@@ -297,6 +315,9 @@ int ha_skiplist::delete_row(const uchar *buf) {
     if (!skip_table) {
         return HA_ERR_CRASHED;
     }
+    
+    // 写入日志
+    log_write(skip_table, LOG_OP_DELETE, buf, table->s->rec_buff_length);
     
     // 如果当前位置指向要删除的行，先重置当前位置
     // 这样可以避免在删除后访问无效的节点
