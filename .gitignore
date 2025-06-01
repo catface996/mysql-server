@@ -29,3 +29,6 @@ scalability_jobs_*
 .project
 .settings/
 
+# MySQL data and logs
+data/
+logs/
