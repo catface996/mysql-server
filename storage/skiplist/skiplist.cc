@@ -366,6 +366,7 @@ int skiptable_save(SkipTable* table, const char* path) {
         }
     }
     
+    fprintf(stderr, "Opening file for writing: %s\n", path);
     FILE* file = fopen(path, "wb");
     if (!file) {
         fprintf(stderr, "Failed to open file: %s, errno: %d\n", path, errno);
@@ -381,6 +382,9 @@ int skiptable_save(SkipTable* table, const char* path) {
         name_len = strlen(table->table_name);
     }
     
+    fprintf(stderr, "Writing file header: magic=%u, version=%u, name_len=%u\n", 
+            magic, version, name_len);
+    
     if (fwrite(&magic, sizeof(magic), 1, file) != 1 ||
         fwrite(&version, sizeof(version), 1, file) != 1 ||
         fwrite(&name_len, sizeof(name_len), 1, file) != 1) {
@@ -390,12 +394,16 @@ int skiptable_save(SkipTable* table, const char* path) {
     }
     
     if (name_len > 0 && table->table_name) {
+        fprintf(stderr, "Writing table name: %s\n", table->table_name);
         if (fwrite(table->table_name, name_len, 1, file) != 1) {
             fprintf(stderr, "Failed to write table name\n");
             fclose(file);
             return -1;
         }
     }
+    
+    fprintf(stderr, "Writing table info: row_count=%u, data_size=%lu\n", 
+            table->row_count, table->data_size);
     
     if (fwrite(&table->row_count, sizeof(table->row_count), 1, file) != 1 ||
         fwrite(&table->data_size, sizeof(table->data_size), 1, file) != 1) {
@@ -413,6 +421,9 @@ int skiptable_save(SkipTable* table, const char* path) {
         primary_list_level = table->primary_list->level;
     }
     
+    fprintf(stderr, "Writing primary list info: size=%u, level=%u\n", 
+            primary_list_size, primary_list_level);
+    
     if (fwrite(&primary_list_size, sizeof(primary_list_size), 1, file) != 1 ||
         fwrite(&primary_list_level, sizeof(primary_list_level), 1, file) != 1) {
         fprintf(stderr, "Failed to write primary list info\n");
@@ -423,7 +434,12 @@ int skiptable_save(SkipTable* table, const char* path) {
     // 写入主键索引节点
     if (table->primary_list && table->primary_list->header && table->primary_list->header->forward) {
         SkipListNode* current = table->primary_list->header->forward[0];
+        uint32_t node_count = 0;
+        
         while (current) {
+            fprintf(stderr, "Writing node %u: data_length=%u\n", 
+                    node_count++, current->data_length);
+            
             if (fwrite(&current->data_length, sizeof(current->data_length), 1, file) != 1) {
                 fprintf(stderr, "Failed to write node data length\n");
                 fclose(file);
@@ -441,7 +457,12 @@ int skiptable_save(SkipTable* table, const char* path) {
         }
     }
     
+    // 确保数据写入磁盘
+    fflush(file);
+    fsync(fileno(file));
     fclose(file);
+    
+    fprintf(stderr, "Table saved successfully to %s\n", path);
     return 0;
 }
 
@@ -451,6 +472,7 @@ SkipTable* skiptable_load(const char* path) {
     
     if (!path) return nullptr;
     
+    fprintf(stderr, "Opening file for reading: %s\n", path);
     FILE* file = fopen(path, "rb");
     if (!file) {
         fprintf(stderr, "Failed to open file: %s, errno: %d\n", path, errno);
@@ -466,6 +488,9 @@ SkipTable* skiptable_load(const char* path) {
         fclose(file);
         return nullptr;
     }
+    
+    fprintf(stderr, "Read file header: magic=%u, version=%u, name_len=%u\n", 
+            magic, version, name_len);
     
     if (magic != 0x534B4C54) {  // "SKLT"
         fprintf(stderr, "Invalid file format\n");
@@ -491,6 +516,7 @@ SkipTable* skiptable_load(const char* path) {
         }
         
         table_name[name_len] = '\0';
+        fprintf(stderr, "Read table name: %s\n", table_name);
     }
     
     // 创建表结构
@@ -513,6 +539,9 @@ SkipTable* skiptable_load(const char* path) {
         return nullptr;
     }
     
+    fprintf(stderr, "Read table info: row_count=%u, data_size=%lu\n", 
+            table->row_count, table->data_size);
+    
     // 读取主键索引信息
     uint32_t primary_list_size, primary_list_level;
     if (fread(&primary_list_size, sizeof(primary_list_size), 1, file) != 1 ||
@@ -523,15 +552,20 @@ SkipTable* skiptable_load(const char* path) {
         return nullptr;
     }
     
+    fprintf(stderr, "Read primary list info: size=%u, level=%u\n", 
+            primary_list_size, primary_list_level);
+    
     // 读取主键索引节点
     for (uint32_t i = 0; i < primary_list_size; i++) {
         uint32_t data_length;
         if (fread(&data_length, sizeof(data_length), 1, file) != 1) {
-            fprintf(stderr, "Failed to read node data length\n");
+            fprintf(stderr, "Failed to read node data length for node %u\n", i);
             skiptable_destroy(table);
             fclose(file);
             return nullptr;
         }
+        
+        fprintf(stderr, "Read node %u: data_length=%u\n", i, data_length);
         
         uchar* data = (uchar*)malloc(data_length);
         if (!data) {
@@ -562,8 +596,10 @@ SkipTable* skiptable_load(const char* path) {
     fclose(file);
     
     // 恢复日志
+    fprintf(stderr, "Recovering log for table\n");
     log_recover(table);
     
+    fprintf(stderr, "Table loaded successfully from %s\n", path);
     return table;
 }
 

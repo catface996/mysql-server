@@ -136,8 +136,14 @@ int ha_skiplist::close(void) {
     fprintf(stderr, "ha_skiplist::close()\n");
     
     // 保存表结构到文件
-    if (skip_table) {
-        skiptable_save(skip_table, skip_table->data_file_path);
+    if (skip_table && skip_table->data_file_path) {
+        fprintf(stderr, "Saving table to %s\n", skip_table->data_file_path);
+        int result = skiptable_save(skip_table, skip_table->data_file_path);
+        if (result) {
+            fprintf(stderr, "Failed to save table to %s\n", skip_table->data_file_path);
+        } else {
+            fprintf(stderr, "Table saved successfully to %s\n", skip_table->data_file_path);
+        }
         free_table_structure(skip_table);
         skip_table = nullptr;
     }
@@ -286,6 +292,15 @@ int ha_skiplist::write_row(uchar *buf) {
     skip_table->row_count++;
     skip_table->data_size += table->s->rec_buff_length;
     
+    // 每次写入后保存表结构
+    if (skip_table->data_file_path) {
+        fprintf(stderr, "Saving table after write_row to %s\n", skip_table->data_file_path);
+        int save_result = skiptable_save(skip_table, skip_table->data_file_path);
+        if (save_result) {
+            fprintf(stderr, "Failed to save table after write_row\n");
+        }
+    }
+    
     return 0;
 }
 
@@ -294,17 +309,59 @@ int ha_skiplist::update_row(const uchar *old_data, uchar *new_data) {
     DBUG_TRACE;
     fprintf(stderr, "ha_skiplist::update_row(old_data=%p, new_data=%p)\n", old_data, new_data);
     
+    if (!skip_table) {
+        return HA_ERR_CRASHED;
+    }
+    
     // 写入日志 - 更新操作可以看作是删除+插入
     log_write(skip_table, LOG_OP_DELETE, old_data, table->s->rec_buff_length);
     log_write(skip_table, LOG_OP_INSERT, new_data, table->s->rec_buff_length);
     
     // 简化版本，先删除旧行，再插入新行
-    int result = delete_row(old_data);
+    // 注意：这里不调用delete_row和write_row，因为它们会各自保存表结构
+    // 我们只想在所有操作完成后保存一次
+    
+    // 如果当前位置指向要删除的行，先重置当前位置
+    current_position = nullptr;
+    
+    // 从主列表中删除旧数据
+    int result = skiplist_delete(skip_table->primary_list, old_data, table->s->rec_buff_length);
     if (result != 0) {
-        return result;
+        return result == 1 ? HA_ERR_KEY_NOT_FOUND : HA_ERR_CRASHED;
     }
     
-    return write_row(new_data);
+    // 更新表统计信息
+    skip_table->row_count--;
+    skip_table->data_size -= table->s->rec_buff_length;
+    
+    // 复制新数据
+    uchar* data_copy = (uchar*)malloc(table->s->rec_buff_length);
+    if (!data_copy) {
+        return HA_ERR_OUT_OF_MEM;
+    }
+    memcpy(data_copy, new_data, table->s->rec_buff_length);
+    
+    // 插入新数据到主列表
+    result = skiplist_insert(skip_table->primary_list, data_copy, table->s->rec_buff_length);
+    if (result != 0) {
+        free(data_copy);
+        return result == 1 ? HA_ERR_FOUND_DUPP_KEY : HA_ERR_OUT_OF_MEM;
+    }
+    
+    // 更新表统计信息
+    skip_table->row_count++;
+    skip_table->data_size += table->s->rec_buff_length;
+    
+    // 更新完成后保存表结构
+    if (skip_table->data_file_path) {
+        fprintf(stderr, "Saving table after update_row to %s\n", skip_table->data_file_path);
+        int save_result = skiptable_save(skip_table, skip_table->data_file_path);
+        if (save_result) {
+            fprintf(stderr, "Failed to save table after update_row\n");
+        }
+    }
+    
+    return 0;
 }
 
 // 删除行
@@ -332,6 +389,15 @@ int ha_skiplist::delete_row(const uchar *buf) {
     // 更新表统计信息
     skip_table->row_count--;
     skip_table->data_size -= table->s->rec_buff_length;
+    
+    // 每次删除后保存表结构
+    if (skip_table->data_file_path) {
+        fprintf(stderr, "Saving table after delete_row to %s\n", skip_table->data_file_path);
+        int save_result = skiptable_save(skip_table, skip_table->data_file_path);
+        if (save_result) {
+            fprintf(stderr, "Failed to save table after delete_row\n");
+        }
+    }
     
     return 0;
 }
