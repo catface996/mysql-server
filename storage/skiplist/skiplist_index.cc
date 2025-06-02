@@ -5,19 +5,24 @@
 
 // 创建索引
 SkipListIndex* skiplist_index_create(const char* name, uint32_t type, uint32_t key_offset, uint32_t key_length) {
-    fprintf(stderr, "skiplist_index_create(name=%s, type=%u, key_offset=%u, key_length=%u)\n", 
+    fprintf(stderr, "DEBUG: skiplist_index_create(name=%s, type=%u, key_offset=%u, key_length=%u)\n", 
             name, type, key_offset, key_length);
     
     SkipListIndex* index = (SkipListIndex*)calloc(1, sizeof(SkipListIndex));
-    if (!index) return nullptr;
+    if (!index) {
+        fprintf(stderr, "ERROR: skiplist_index_create - 内存分配失败\n");
+        return nullptr;
+    }
     
     index->index_type = type;
     index->key_offset = key_offset;
     index->key_length = key_length;
     
     // 创建索引列表
+    fprintf(stderr, "DEBUG: skiplist_index_create - 创建索引列表\n");
     index->list = skiplist_create(MAX_SKIPLIST_LEVEL);
     if (!index->list) {
+        fprintf(stderr, "ERROR: skiplist_index_create - 创建索引列表失败\n");
         free(index);
         return nullptr;
     }
@@ -27,12 +32,17 @@ SkipListIndex* skiplist_index_create(const char* name, uint32_t type, uint32_t k
         size_t name_len = strlen(name);
         index->name = (char*)malloc(name_len + 1);
         if (!index->name) {
+            fprintf(stderr, "ERROR: skiplist_index_create - 索引名称内存分配失败\n");
             skiplist_destroy(index->list);
             free(index);
             return nullptr;
         }
         strcpy(index->name, name);
+        fprintf(stderr, "DEBUG: skiplist_index_create - 设置索引名称: %s\n", index->name);
     }
+    
+    fprintf(stderr, "DEBUG: skiplist_index_create - 索引创建成功: name=%s, type=%u, offset=%u, length=%u\n", 
+            index->name, index->index_type, index->key_offset, index->key_length);
     
     return index;
 }
@@ -112,17 +122,39 @@ int skiplist_index_delete(SkipListIndex* index, const uchar* record, uint32_t re
 
 // 在索引中搜索记录
 SkipListNode* skiplist_index_search(SkipListIndex* index, const uchar* key, uint32_t key_length) {
-    fprintf(stderr, "skiplist_index_search(index=%p, key=%p, key_length=%u)\n", 
+    fprintf(stderr, "DEBUG: skiplist_index_search(index=%p, key=%p, key_length=%u)\n", 
             index, key, key_length);
     
     if (!index || !key || key_length == 0) {
+        fprintf(stderr, "ERROR: skiplist_index_search - 参数错误\n");
         return nullptr;  // 参数错误
     }
     
+    // 打印索引信息
+    fprintf(stderr, "DEBUG: skiplist_index_search - 索引信息: name=%s, type=%u, key_offset=%u, key_length=%u\n", 
+            index->name, index->index_type, index->key_offset, index->key_length);
+    
+    // 打印键值的十六进制表示
+    fprintf(stderr, "DEBUG: skiplist_index_search - 搜索键值(hex): ");
+    for (uint32_t i = 0; i < key_length; i++) {
+        fprintf(stderr, "%02x ", key[i]);
+    }
+    fprintf(stderr, "\n");
+    
     // 检查键长度是否有效
     if (key_length != index->key_length) {
+        fprintf(stderr, "ERROR: skiplist_index_search - 键长度不匹配: 期望=%u, 实际=%u\n", 
+                index->key_length, key_length);
         return nullptr;  // 参数错误
     }
+    
+    if (!index->list || !index->list->header) {
+        fprintf(stderr, "ERROR: skiplist_index_search - 索引列表或头节点为空\n");
+        return nullptr;
+    }
+    
+    fprintf(stderr, "DEBUG: skiplist_index_search - 开始搜索, 当前列表级别=%u, 大小=%u\n", 
+            index->list->level, index->list->size);
     
     SkipListNode* current = index->list->header;
     
@@ -138,9 +170,16 @@ SkipListNode* skiplist_index_search(SkipListIndex* index, const uchar* key, uint
     current = current->forward[0];
     
     // 检查是否找到匹配的键
-    if (current && memcmp(current->data + index->key_offset, key, key_length) == 0) {
-        return current;
+    if (current) {
+        int cmp_result = memcmp(current->data + index->key_offset, key, key_length);
+        fprintf(stderr, "DEBUG: skiplist_index_search - 比较结果: %d (0表示匹配)\n", cmp_result);
+        
+        if (cmp_result == 0) {
+            fprintf(stderr, "DEBUG: skiplist_index_search - 找到匹配节点\n");
+            return current;
+        }
     }
     
+    fprintf(stderr, "DEBUG: skiplist_index_search - 未找到匹配节点\n");
     return nullptr;
 }

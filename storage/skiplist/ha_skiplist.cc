@@ -12,13 +12,17 @@ static handler* skiplist_create_handler(handlerton* hton, TABLE_SHARE* table, bo
 
 // 初始化存储引擎
 static int skiplist_init(void* p) {
-    fprintf(stderr, "skiplist_init(p=%p)\n", p);
+    fprintf(stderr, "DEBUG: skiplist_init(p=%p) - 初始化存储引擎\n", p);
     
     handlerton* skiplist_hton = (handlerton*)p;
     skiplist_hton->state = SHOW_OPTION_YES;
     skiplist_hton->db_type = DB_TYPE_UNKNOWN;
     skiplist_hton->create = skiplist_create_handler;
+    
+    // 设置支持的标志
     skiplist_hton->flags = HTON_CAN_RECREATE;
+    
+    fprintf(stderr, "DEBUG: skiplist_init - 设置标志 flags=%u\n", (uint)skiplist_hton->flags);
     
     return 0;
 }
@@ -61,40 +65,63 @@ ha_skiplist::~ha_skiplist() {
 
 // 表标志
 ulonglong ha_skiplist::table_flags() const {
-    fprintf(stderr, "ha_skiplist::table_flags()\n");
-    return HA_NO_TRANSACTIONS | HA_NO_AUTO_INCREMENT | HA_PRIMARY_KEY_REQUIRED_FOR_POSITION | 
-           HA_PRIMARY_KEY_IN_READ_INDEX | HA_CAN_INDEX_BLOBS;
+    fprintf(stderr, "DEBUG: ha_skiplist::table_flags() - 返回表标志\n");
+    ulonglong flags = HA_NO_TRANSACTIONS | HA_NO_AUTO_INCREMENT | HA_PRIMARY_KEY_REQUIRED_FOR_POSITION |
+                     HA_PRIMARY_KEY_IN_READ_INDEX | HA_CAN_INDEX_BLOBS | HA_PRIMARY_KEY_REQUIRED_FOR_DELETE;
+    fprintf(stderr, "DEBUG: table_flags - 返回标志值: %llu\n", flags);
+    return flags;
 }
 
 // 索引标志
 ulong ha_skiplist::index_flags(uint idx, uint part, bool all_parts) const {
-    return HA_READ_NEXT | HA_READ_RANGE | HA_READ_AFTER_KEY | HA_KEYREAD_ONLY;
+    fprintf(stderr, "DEBUG: ha_skiplist::index_flags(idx=%u, part=%u, all_parts=%d) - 返回索引标志\n", 
+            idx, part, all_parts);
+    ulong flags = HA_READ_NEXT | HA_READ_RANGE | HA_READ_AFTER_KEY | HA_KEYREAD_ONLY;
+    fprintf(stderr, "DEBUG: index_flags - 返回标志值: %lu\n", flags);
+    return flags;
 }
 
 // 创建表结构
 SkipTable* ha_skiplist::create_table_structure(const char* name) {
+    fprintf(stderr, "DEBUG: create_table_structure(name=%s)\n", name);
+    
     SkipTable* table = skiptable_create(name);
+    if (!table) {
+        fprintf(stderr, "ERROR: create_table_structure - skiptable_create失败\n");
+        return nullptr;
+    }
+    
+    fprintf(stderr, "DEBUG: create_table_structure - 表结构创建成功\n");
     
     // 创建主键索引
     if (table) {
         table->index_count = 1;  // 只有主键索引
+        fprintf(stderr, "DEBUG: create_table_structure - 设置索引数量=%u\n", table->index_count);
+        
         table->indexes = (SkipListIndex**)malloc(sizeof(SkipListIndex*));
         if (!table->indexes) {
+            fprintf(stderr, "ERROR: create_table_structure - 索引数组内存分配失败\n");
             skiptable_destroy(table);
             return nullptr;
         }
         
         // 主键索引与主列表相同
+        fprintf(stderr, "DEBUG: create_table_structure - 创建主键索引\n");
         table->indexes[0] = skiplist_index_create("PRIMARY", INDEX_TYPE_PRIMARY, 0, 0);
         if (!table->indexes[0]) {
+            fprintf(stderr, "ERROR: create_table_structure - 主键索引创建失败\n");
             free(table->indexes);
             skiptable_destroy(table);
             return nullptr;
         }
         
         // 设置主键索引的列表为主列表
+        fprintf(stderr, "DEBUG: create_table_structure - 设置主键索引列表为主列表\n");
         skiplist_destroy(table->indexes[0]->list);
         table->indexes[0]->list = table->primary_list;
+        
+        fprintf(stderr, "DEBUG: create_table_structure - 主键索引创建成功: name=%s, type=%u\n", 
+                table->indexes[0]->name, table->indexes[0]->index_type);
     }
     
     return table;
@@ -126,38 +153,49 @@ void ha_skiplist::free_table_structure(SkipTable* table_ptr) {
 int ha_skiplist::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
                        dd::Table *table_def) {
     DBUG_TRACE;
-    fprintf(stderr, "ha_skiplist::create(name=%s, form=%p, create_info=%p, table_def=%p)\n", 
+    fprintf(stderr, "DEBUG: ha_skiplist::create(name=%s, form=%p, create_info=%p, table_def=%p)\n",
             name, form, create_info, table_def);
     
-    // 设置表支持的键数量
-    if (form->s) {
-        form->s->keys_in_use.set_bit(0);  // 设置主键可用
-        form->s->keys = 1;                // 支持1个键（主键）
-        form->s->key_parts = 1;           // 每个键由1个部分组成
+    // 检查是否有主键
+    fprintf(stderr, "DEBUG: create - 检查主键, primary_key=%d, MAX_KEY=%d\n", 
+            form->s->primary_key, MAX_KEY);
+    
+    if (form->s->primary_key == MAX_KEY) {
+        // 主键是必需的
+        fprintf(stderr, "ERROR: Primary key is required for SkipList tables\n");
+        return HA_ERR_GENERIC;
     }
     
     // 创建表结构
     SkipTable* table = create_table_structure(name);
     if (!table) {
+        fprintf(stderr, "ERROR: create - 创建表结构失败\n");
         return HA_ERR_OUT_OF_MEM;
     }
     
     // 处理主键
-    if (form->s->primary_key != MAX_KEY) {
-        KEY *key_info = &form->s->key_info[form->s->primary_key];
-        KEY_PART_INFO *key_part = key_info->key_part;
-        
-        // 设置主键索引信息
-        if (table->indexes && table->indexes[0]) {
-            table->indexes[0]->key_offset = key_part->offset;
-            table->indexes[0]->key_length = key_part->length;
-            fprintf(stderr, "Primary key: offset=%u, length=%u\n", 
-                    key_part->offset, key_part->length);
-        }
+    KEY *key_info = &form->s->key_info[form->s->primary_key];
+    KEY_PART_INFO *key_part = key_info->key_part;
+    
+    fprintf(stderr, "DEBUG: create - 处理主键, key_name=%s, key_parts=%d\n", 
+            key_info->name, key_info->user_defined_key_parts);
+    
+    // 设置主键索引信息
+    if (table->indexes && table->indexes[0]) {
+        table->indexes[0]->key_offset = key_part->offset;
+        table->indexes[0]->key_length = key_part->length;
+        fprintf(stderr, "DEBUG: create - 设置主键索引, offset=%u, length=%u\n",
+                key_part->offset, key_part->length);
+    } else {
+        fprintf(stderr, "ERROR: create - 主键索引未初始化\n");
     }
     
     // 保存表结构到文件
+    fprintf(stderr, "DEBUG: create - 保存表结构到文件 %s\n", table->data_file_path);
     int result = skiptable_save(table, table->data_file_path);
+    if (result) {
+        fprintf(stderr, "ERROR: create - 保存表结构失败, result=%d\n", result);
+    }
     
     // 释放表结构
     free_table_structure(table);
@@ -169,34 +207,49 @@ int ha_skiplist::create(const char *name, TABLE *form, HA_CREATE_INFO *create_in
 int ha_skiplist::open(const char *name, int mode, uint test_if_locked,
                      const dd::Table *table_def) {
     DBUG_TRACE;
-    fprintf(stderr, "ha_skiplist::open(name=%s, mode=%d, test_if_locked=%u, table_def=%p)\n", 
+    fprintf(stderr, "DEBUG: ha_skiplist::open(name=%s, mode=%d, test_if_locked=%u, table_def=%p)\n", 
             name, mode, test_if_locked, table_def);
     
     // 从文件加载表结构
     char data_file_path[MAX_PATH_LEN];
     snprintf(data_file_path, MAX_PATH_LEN, "%s.skl", name);
+    fprintf(stderr, "DEBUG: open - 尝试从文件加载表结构: %s\n", data_file_path);
     
     skip_table = skiptable_load(data_file_path);
     if (!skip_table) {
+        fprintf(stderr, "DEBUG: open - 加载表结构失败，创建新的表结构\n");
         // 如果加载失败，创建新的表结构
         skip_table = create_table_structure(name);
         if (!skip_table) {
+            fprintf(stderr, "ERROR: open - 创建表结构失败\n");
             return HA_ERR_CRASHED;
         }
+    } else {
+        fprintf(stderr, "DEBUG: open - 成功加载表结构，row_count=%u\n", skip_table->row_count);
     }
     
     // 处理主键
+    fprintf(stderr, "DEBUG: open - 检查主键, primary_key=%d, MAX_KEY=%d\n", 
+            table->s->primary_key, MAX_KEY);
+    
     if (table->s->primary_key != MAX_KEY) {
         KEY *key_info = &table->s->key_info[table->s->primary_key];
         KEY_PART_INFO *key_part = key_info->key_part;
+        
+        fprintf(stderr, "DEBUG: open - 处理主键, key_name=%s, key_parts=%d\n", 
+                key_info->name, key_info->user_defined_key_parts);
         
         // 设置主键索引信息
         if (skip_table->indexes && skip_table->indexes[0]) {
             skip_table->indexes[0]->key_offset = key_part->offset;
             skip_table->indexes[0]->key_length = key_part->length;
-            fprintf(stderr, "Primary key: offset=%u, length=%u\n", 
+            fprintf(stderr, "DEBUG: open - 设置主键索引, offset=%u, length=%u\n",
                     key_part->offset, key_part->length);
+        } else {
+            fprintf(stderr, "ERROR: open - 主键索引未初始化\n");
         }
+    } else {
+        fprintf(stderr, "WARNING: open - 表没有主键\n");
     }
     
     // 初始化锁数据
@@ -329,17 +382,10 @@ int ha_skiplist::info(uint flag) {
     stats.records = skip_table->row_count;
     stats.data_file_length = skip_table->data_size;
     stats.index_file_length = 0;
-    stats.mean_rec_length = skip_table->row_count ? 
+    stats.mean_rec_length = skip_table->row_count ?
                            (ulong)(skip_table->data_size / skip_table->row_count) : 0;
     stats.delete_length = 0;
     stats.create_time = 0;
-    
-    // 设置支持的键数量
-    if (table_share) {
-        table_share->keys_in_use.set_bit(0);  // 设置主键可用
-        table_share->keys = 1;                // 支持1个键（主键）
-        table_share->key_parts = 1;           // 每个键由1个部分组成
-    }
     
     return 0;
 }
@@ -347,15 +393,43 @@ int ha_skiplist::info(uint flag) {
 // 写入行
 int ha_skiplist::write_row(uchar *buf) {
     DBUG_TRACE;
-    fprintf(stderr, "ha_skiplist::write_row(buf=%p)\n", buf);
+    fprintf(stderr, "DEBUG: ha_skiplist::write_row(buf=%p)\n", buf);
     
-    if (!skip_table) {
+    if (!skip_table || !skip_table->indexes || !skip_table->indexes[0]) {
+        fprintf(stderr, "ERROR: write_row - 表结构或索引未初始化\n");
         return HA_ERR_CRASHED;
     }
     
+    // 获取主键索引
+    SkipListIndex* primary_index = skip_table->indexes[0];
+    fprintf(stderr, "DEBUG: write_row - 主键索引信息: name=%s, key_offset=%u, key_length=%u\n", 
+            primary_index->name, primary_index->key_offset, primary_index->key_length);
+    
+    // 检查主键是否已存在
+    const uchar* key = buf + primary_index->key_offset;
+    uint key_length = primary_index->key_length;
+    
+    // 打印主键值的十六进制表示
+    fprintf(stderr, "DEBUG: write_row - 主键值(hex): ");
+    for (uint i = 0; i < key_length; i++) {
+        fprintf(stderr, "%02x ", key[i]);
+    }
+    fprintf(stderr, "\n");
+    
+    // 搜索主键
+    fprintf(stderr, "DEBUG: write_row - 搜索主键是否已存在\n");
+    SkipListNode* existing = skiplist_index_search(primary_index, key, key_length);
+    if (existing) {
+        fprintf(stderr, "ERROR: write_row - 主键已存在，返回重复键错误\n");
+        // 主键已存在，返回重复键错误
+        return HA_ERR_FOUND_DUPP_KEY;
+    }
+    
     // 复制数据
+    fprintf(stderr, "DEBUG: write_row - 复制数据, rec_buff_length=%u\n", (uint)table->s->rec_buff_length);
     uchar* data_copy = (uchar*)malloc(table->s->rec_buff_length);
     if (!data_copy) {
+        fprintf(stderr, "ERROR: write_row - 内存分配失败\n");
         return HA_ERR_OUT_OF_MEM;
     }
     memcpy(data_copy, buf, table->s->rec_buff_length);
@@ -364,8 +438,10 @@ int ha_skiplist::write_row(uchar *buf) {
     log_write(skip_table, LOG_OP_INSERT, data_copy, table->s->rec_buff_length);
     
     // 插入到主列表
+    fprintf(stderr, "DEBUG: write_row - 插入数据到主列表\n");
     int result = skiplist_insert(skip_table->primary_list, data_copy, table->s->rec_buff_length);
     if (result != 0) {
+        fprintf(stderr, "ERROR: write_row - 插入失败, result=%d\n", result);
         free(data_copy);
         return result == 1 ? HA_ERR_FOUND_DUPP_KEY : HA_ERR_OUT_OF_MEM;
     }
@@ -373,13 +449,15 @@ int ha_skiplist::write_row(uchar *buf) {
     // 更新表统计信息
     skip_table->row_count++;
     skip_table->data_size += table->s->rec_buff_length;
+    fprintf(stderr, "DEBUG: write_row - 更新表统计信息, row_count=%u, data_size=%llu\n", 
+            skip_table->row_count, (unsigned long long)skip_table->data_size);
     
     // 每次写入后保存表结构
     if (skip_table->data_file_path) {
-        fprintf(stderr, "Saving table after write_row to %s\n", skip_table->data_file_path);
+        fprintf(stderr, "DEBUG: write_row - 保存表结构到文件 %s\n", skip_table->data_file_path);
         int save_result = skiptable_save(skip_table, skip_table->data_file_path);
         if (save_result) {
-            fprintf(stderr, "Failed to save table after write_row\n");
+            fprintf(stderr, "ERROR: write_row - 保存表结构失败, result=%d\n", save_result);
         }
     }
     
@@ -664,3 +742,20 @@ int ha_skiplist::index_last(uchar *buf) {
     // 跳表不支持高效的获取最后一个记录，返回不支持
     return HA_ERR_UNSUPPORTED;
 }
+
+// 这些方法已在上面定义，删除重复定义
+
+// 这些方法已在上面定义，删除重复定义
+
+// 这些方法已在上面定义，删除重复定义
+
+// 这些方法已在上面定义，删除重复定义
+
+// 这些方法已在上面定义，删除重复定义
+
+// 这些方法已在上面定义，删除重复定义
+
+// 这些方法已在前面定义，删除重复定义
+// 这些方法已在前面定义，删除重复定义
+
+// 这些方法已在前面定义，删除重复定义
