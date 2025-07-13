@@ -305,6 +305,10 @@ SkipTable* skiptable_create(const char* name) {
     }
     sprintf(table->log_file_path, "%s.log", name);
     
+    // 初始化索引
+    table->index_count = 0;
+    table->indexes = nullptr;
+    
     return table;
 }
 
@@ -313,6 +317,21 @@ void skiptable_destroy(SkipTable* table) {
     fprintf(stderr, "skiptable_destroy(table=%p)\n", table);
     
     if (!table) return;
+    
+    // 释放索引
+    if (table->indexes) {
+        for (uint32_t i = 0; i < table->index_count; i++) {
+            if (table->indexes[i]) {
+                // 对于主键索引，不要释放列表，因为它与主列表相同
+                if (table->indexes[i]->index_type == INDEX_TYPE_PRIMARY) {
+                    table->indexes[i]->list = nullptr;
+                }
+                skiplist_index_destroy(table->indexes[i]);
+            }
+        }
+        free(table->indexes);
+        table->indexes = nullptr;
+    }
     
     // 释放主列表
     if (table->primary_list) {

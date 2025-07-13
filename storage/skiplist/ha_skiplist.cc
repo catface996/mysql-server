@@ -93,35 +93,11 @@ SkipTable* ha_skiplist::create_table_structure(const char* name) {
     
     fprintf(stderr, "DEBUG: create_table_structure - 表结构创建成功\n");
     
-    // 创建主键索引
+    // Skip List不需要索引，只使用主列表
     if (table) {
-        table->index_count = 1;  // 只有主键索引
-        fprintf(stderr, "DEBUG: create_table_structure - 设置索引数量=%u\n", table->index_count);
-        
-        table->indexes = (SkipListIndex**)malloc(sizeof(SkipListIndex*));
-        if (!table->indexes) {
-            fprintf(stderr, "ERROR: create_table_structure - 索引数组内存分配失败\n");
-            skiptable_destroy(table);
-            return nullptr;
-        }
-        
-        // 主键索引与主列表相同
-        fprintf(stderr, "DEBUG: create_table_structure - 创建主键索引\n");
-        table->indexes[0] = skiplist_index_create("PRIMARY", INDEX_TYPE_PRIMARY, 0, 0);
-        if (!table->indexes[0]) {
-            fprintf(stderr, "ERROR: create_table_structure - 主键索引创建失败\n");
-            free(table->indexes);
-            skiptable_destroy(table);
-            return nullptr;
-        }
-        
-        // 设置主键索引的列表为主列表
-        fprintf(stderr, "DEBUG: create_table_structure - 设置主键索引列表为主列表\n");
-        skiplist_destroy(table->indexes[0]->list);
-        table->indexes[0]->list = table->primary_list;
-        
-        fprintf(stderr, "DEBUG: create_table_structure - 主键索引创建成功: name=%s, type=%u\n", 
-                table->indexes[0]->name, table->indexes[0]->index_type);
+        table->index_count = 0;  // 无索引
+        table->indexes = nullptr;  // 不创建索引数组
+        fprintf(stderr, "DEBUG: create_table_structure - Skip List表无需索引，使用主列表存储数据\n");
     }
     
     return table;
@@ -161,9 +137,8 @@ int ha_skiplist::create(const char *name, TABLE *form, HA_CREATE_INFO *create_in
             form->s->primary_key, MAX_KEY);
     
     if (form->s->primary_key == MAX_KEY) {
-        // 主键是必需的
-        fprintf(stderr, "ERROR: Primary key is required for SkipList tables\n");
-        return HA_ERR_GENERIC;
+        // Skip List不需要主键，这是正常情况
+        fprintf(stderr, "DEBUG: create - Skip List表不需要主键，继续创建\n");
     }
     
     // 创建表结构
@@ -173,21 +148,9 @@ int ha_skiplist::create(const char *name, TABLE *form, HA_CREATE_INFO *create_in
         return HA_ERR_OUT_OF_MEM;
     }
     
-    // 处理主键
-    KEY *key_info = &form->s->key_info[form->s->primary_key];
-    KEY_PART_INFO *key_part = key_info->key_part;
-    
-    fprintf(stderr, "DEBUG: create - 处理主键, key_name=%s, key_parts=%d\n", 
-            key_info->name, key_info->user_defined_key_parts);
-    
-    // 设置主键索引信息
-    if (table->indexes && table->indexes[0]) {
-        table->indexes[0]->key_offset = key_part->offset;
-        table->indexes[0]->key_length = key_part->length;
-        fprintf(stderr, "DEBUG: create - 设置主键索引, offset=%u, length=%u\n",
-                key_part->offset, key_part->length);
-    } else {
-        fprintf(stderr, "ERROR: create - 主键索引未初始化\n");
+    // Skip List不使用主键，跳过主键处理
+    if (form->s->primary_key != MAX_KEY) {
+        fprintf(stderr, "DEBUG: create - 检测到主键定义，但Skip List不使用主键索引\n");
     }
     
     // 保存表结构到文件
@@ -228,28 +191,11 @@ int ha_skiplist::open(const char *name, int mode, uint test_if_locked,
         fprintf(stderr, "DEBUG: open - 成功加载表结构，row_count=%u\n", skip_table->row_count);
     }
     
-    // 处理主键
-    fprintf(stderr, "DEBUG: open - 检查主键, primary_key=%d, MAX_KEY=%d\n", 
-            table->s->primary_key, MAX_KEY);
-    
+    // Skip List不使用索引，跳过主键处理
     if (table->s->primary_key != MAX_KEY) {
-        KEY *key_info = &table->s->key_info[table->s->primary_key];
-        KEY_PART_INFO *key_part = key_info->key_part;
-        
-        fprintf(stderr, "DEBUG: open - 处理主键, key_name=%s, key_parts=%d\n", 
-                key_info->name, key_info->user_defined_key_parts);
-        
-        // 设置主键索引信息
-        if (skip_table->indexes && skip_table->indexes[0]) {
-            skip_table->indexes[0]->key_offset = key_part->offset;
-            skip_table->indexes[0]->key_length = key_part->length;
-            fprintf(stderr, "DEBUG: open - 设置主键索引, offset=%u, length=%u\n",
-                    key_part->offset, key_part->length);
-        } else {
-            fprintf(stderr, "ERROR: open - 主键索引未初始化\n");
-        }
+        fprintf(stderr, "DEBUG: open - 检测到主键定义，但Skip List不使用索引\n");
     } else {
-        fprintf(stderr, "WARNING: open - 表没有主键\n");
+        fprintf(stderr, "DEBUG: open - 表没有主键，这对Skip List是正常的\n");
     }
     
     // 初始化锁数据
@@ -395,35 +341,13 @@ int ha_skiplist::write_row(uchar *buf) {
     DBUG_TRACE;
     fprintf(stderr, "DEBUG: ha_skiplist::write_row(buf=%p)\n", buf);
     
-    if (!skip_table || !skip_table->indexes || !skip_table->indexes[0]) {
-        fprintf(stderr, "ERROR: write_row - 表结构或索引未初始化\n");
+    if (!skip_table || !skip_table->primary_list) {
+        fprintf(stderr, "ERROR: write_row - 表结构或主列表未初始化\n");
         return HA_ERR_CRASHED;
     }
     
-    // 获取主键索引
-    SkipListIndex* primary_index = skip_table->indexes[0];
-    fprintf(stderr, "DEBUG: write_row - 主键索引信息: name=%s, key_offset=%u, key_length=%u\n", 
-            primary_index->name, primary_index->key_offset, primary_index->key_length);
-    
-    // 检查主键是否已存在
-    const uchar* key = buf + primary_index->key_offset;
-    uint key_length = primary_index->key_length;
-    
-    // 打印主键值的十六进制表示
-    fprintf(stderr, "DEBUG: write_row - 主键值(hex): ");
-    for (uint i = 0; i < key_length; i++) {
-        fprintf(stderr, "%02x ", key[i]);
-    }
-    fprintf(stderr, "\n");
-    
-    // 搜索主键
-    fprintf(stderr, "DEBUG: write_row - 搜索主键是否已存在\n");
-    SkipListNode* existing = skiplist_index_search(primary_index, key, key_length);
-    if (existing) {
-        fprintf(stderr, "ERROR: write_row - 主键已存在，返回重复键错误\n");
-        // 主键已存在，返回重复键错误
-        return HA_ERR_FOUND_DUPP_KEY;
-    }
+    // Skip List直接使用主列表存储数据，不使用索引
+    fprintf(stderr, "DEBUG: write_row - 直接插入到主列表\n");
     
     // 复制数据
     fprintf(stderr, "DEBUG: write_row - 复制数据, rec_buff_length=%u\n", (uint)table->s->rec_buff_length);

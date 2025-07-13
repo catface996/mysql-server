@@ -1,0 +1,33 @@
+[mysqld]
+# 设置SkipList为默认存储引擎
+default-storage-engine=SKIPLIST
+
+# 加载SkipList存储引擎插件
+plugin-load-add=ha_skiplist.so
+
+# 基本配置
+port=3306
+socket=/tmp/mysql_skiplist.sock
+pid-file=/tmp/mysql_skiplist.pid
+
+# 数据目录
+datadir=/Users/catface/Documents/code/GitHub/mysql-server/build/data
+
+# 日志配置
+log-error=/Users/catface/Documents/code/GitHub/mysql-server/build/data/mysql_skiplist.err
+general_log=1
+general_log_file=/Users/catface/Documents/code/GitHub/mysql-server/build/data/general.log
+
+# 安全配置
+bind-address=127.0.0.1
+
+# 性能配置
+max_connections=100
+innodb_buffer_pool_size=128M
+
+[mysql]
+# 客户端配置
+socket=/tmp/mysql_skiplist.sock
+
+[client]
+socket=/tmp/mysql_skiplist.sock
