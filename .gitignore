@@ -17,6 +17,7 @@ TAGS_sorted_by_file
 .vscode/
 
 build/
+build-*/
 datatool/
 datatools/
 __pycache__/
@@ -24,6 +25,18 @@ heatwaveml.*
 automl.egg-info/
 _userconf.sh
 scalability_jobs_*
+
+# MySQL build artifacts
+runtime_output_directory/
+plugin_output_directory/
+archive_output_directory/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.so
+*.dylib
+*.dll
 # Configuration files for Eclipse
 .cproject
 .project

@@ -38,23 +38,36 @@
 
 ## 常用构建命令
 
+### 编译并行度设置
+- **当前系统**: 16 核 CPU (物理核心: 16)
+- **推荐并行度**: 使用至少 70% 的 CPU 核心进行编译
+- **建议参数**: `-j12` (16 * 0.75 = 12)
+
 ### 基本构建（发布版）
 ```bash
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+make -j12
 ```
 
 ### 调试构建
 ```bash
 cmake -DWITH_DEBUG=1 ..
-make -j$(nproc)
+make -j12
+```
+
+### macOS 特定构建
+```bash
+# 检查 CPU 核心数
+sysctl -n hw.ncpu
+# 使用 70% 的核心数进行编译
+make -j$(echo "$(sysctl -n hw.ncpu) * 0.7 / 1" | bc)
 ```
 
 ### Windows 构建
 ```bash
 cmake .. -G "Visual Studio 16 2019" -A x64
-cmake --build . --config RelWithDebInfo
+cmake --build . --config RelWithDebInfo --parallel 12
 ```
 
 ### 常用 CMake 选项
