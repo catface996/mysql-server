@@ -1,0 +1,25 @@
+# SBT Storage Engine - Ignore compiled test executables
+test_sbt_basic
+test_sbt_advanced
+
+# Ignore other common build artifacts
+*.o
+*.so
+*.dylib
+*.a
+*.exe
+
+# Ignore temporary files
+*.tmp
+*.temp
+*~
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
