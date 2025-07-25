@@ -30,14 +30,24 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/unittest/gunit/include
 )
 
+# SBT source files (needed for testing)
+SET(SBT_SOURCES
+  ../src/sbt_tree.cc
+  ../src/sbt_file.cc
+  ../src/sbt_share.cc
+  ../src/sbt_common.cc
+)
+
 # Test sources
 SET(SBT_TEST_SOURCES
   sbt_tree_test.cc
+  sbt_node_test.cc
   sbt_file_test.cc
+  sbt_basic_test.cc
 )
 
 # Create test executable
-MYSQL_ADD_EXECUTABLE(sbt_unittest ${SBT_TEST_SOURCES}
+MYSQL_ADD_EXECUTABLE(sbt_unittest ${SBT_TEST_SOURCES} ${SBT_SOURCES}
   LINK_LIBRARIES gunit_large mysys strings
   SKIP_INSTALL
 )

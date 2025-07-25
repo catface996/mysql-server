@@ -207,6 +207,13 @@ private:
    * @return Pointer to node if found, nullptr if not found
    */
   SBT_node *find_by_data_recursive(SBT_node *node, const uchar *data, uint length);
+
+  /** Find next node by insert_id (for in-order traversal)
+   * @param[in] node Current node
+   * @param[in] current_id Current insert_id
+   * @return Pointer to next node, nullptr if not found
+   */
+  SBT_node *find_next_by_insert_id(SBT_node *node, sbt_insert_id_t current_id);
 };
 
 #endif /* sbt_tree_h */
