@@ -15,10 +15,16 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Standalone tests
-STANDALONE_TESTS = test_insertion_standalone
+STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced
 STANDALONE_TARGETS = $(addprefix $(BUILD_DIR)/, $(STANDALONE_TESTS))
 
 $(BUILD_DIR)/test_insertion_standalone: $(STANDALONE_DIR)/test_insertion_standalone.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_deletion_standalone: $(STANDALONE_DIR)/test_deletion_standalone.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_deletion_advanced: $(STANDALONE_DIR)/test_deletion_advanced.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 # Integration tests
@@ -80,6 +86,12 @@ run-all: run-standalone run-integration run-performance
 test_insertion_standalone: $(BUILD_DIR)/test_insertion_standalone
 	./$(BUILD_DIR)/test_insertion_standalone
 
+test_deletion_standalone: $(BUILD_DIR)/test_deletion_standalone
+	./$(BUILD_DIR)/test_deletion_standalone
+
+test_deletion_advanced: $(BUILD_DIR)/test_deletion_advanced
+	./$(BUILD_DIR)/test_deletion_advanced
+
 verify_unit_tests: $(BUILD_DIR)/verify_unit_tests
 	./$(BUILD_DIR)/verify_unit_tests
 
@@ -110,6 +122,8 @@ help:
 	@echo "  run-performance     - Run performance tests"
 	@echo ""
 	@echo "  test_insertion_standalone - Build and run insertion test"
+	@echo "  test_deletion_standalone - Build and run deletion test"
+	@echo "  test_deletion_advanced - Build and run advanced deletion test"
 	@echo "  verify_unit_tests   - Build and run unit test verification"
 	@echo "  test_sbt_basic      - Build and run basic tests"
 	@echo "  test_sbt_advanced   - Build and run advanced tests"

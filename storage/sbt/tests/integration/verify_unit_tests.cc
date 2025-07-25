@@ -162,6 +162,25 @@ public:
   /** Check if tree is empty */
   bool is_empty() const { return root == nullptr; }
 
+  /** Remove a record by data content */
+  int remove(const uchar *data, uint length) {
+    if (!data || length == 0) {
+      return SBT_ERR_INVALID_ARGUMENT;
+    }
+
+    // Find the node to remove first
+    SBT_node *node_to_remove = find_by_data(data, length);
+    if (!node_to_remove) {
+      return SBT_ERR_INVALID_ARGUMENT; // Record not found
+    }
+
+    root = remove_node(root, data, length);
+    if (record_count > 0) {
+      record_count--;
+    }
+    return SBT_SUCCESS;
+  }
+
   /** Clear all records from the tree */
   void clear() {
     root = nullptr;
@@ -192,6 +211,71 @@ private:
       update_size(node);
       // Maintain SBT property - right subtree was modified
       return maintain(node, true);
+    }
+  }
+
+  /** Remove a node from the tree (recursive) */
+  SBT_node *remove_node(SBT_node *node, const uchar *data, uint length) {
+    if (!node) {
+      return nullptr;
+    }
+
+    // Check if this is the node to remove
+    if (sbt_data_compare(node->data, node->data_length, data, length) == 0) {
+      // Case 1: Node has no children
+      if (!node->left && !node->right) {
+        return nullptr;
+      }
+      
+      // Case 2: Node has only right child
+      if (!node->left) {
+        return node->right;
+      }
+      
+      // Case 3: Node has only left child
+      if (!node->right) {
+        return node->left;
+      }
+      
+      // Case 4: Node has both children
+      // Find the minimum node in the right subtree (successor)
+      SBT_node *successor = find_min(node->right);
+      
+      // Copy successor's data to current node
+      uchar *new_data = (uchar *)mem_root.Alloc(successor->data_length);
+      if (new_data) {
+        memcpy(new_data, successor->data, successor->data_length);
+        node->data = new_data;
+        node->data_length = successor->data_length;
+        node->insert_id = successor->insert_id;
+      }
+      
+      // Remove the successor from right subtree
+      node->right = remove_node(node->right, successor->data, successor->data_length);
+      
+      // Update size and maintain SBT property
+      update_size(node);
+      return maintain(node, true); // Right subtree was modified
+    } else {
+      // Recursively search in left and right subtrees
+      SBT_node *original_left = node->left;
+      SBT_node *original_right = node->right;
+      
+      node->left = remove_node(node->left, data, length);
+      node->right = remove_node(node->right, data, length);
+      
+      // Update size
+      update_size(node);
+      
+      // Maintain SBT property based on which subtree was modified
+      if (node->left != original_left) {
+        node = maintain(node, false); // Left subtree was modified
+      }
+      if (node->right != original_right) {
+        node = maintain(node, true);  // Right subtree was modified
+      }
+      
+      return node;
     }
   }
 
@@ -602,9 +686,26 @@ private:
         tree->insert((const uchar *)data2, strlen(data2));
         assert_equal((uint64_t)2, tree->get_record_count(), "Initial record count");
         
-        // Note: The current implementation doesn't have remove() fully implemented
-        // This test would need the remove functionality to be completed
-        std::cout << "[SKIP] Record removal test - remove() not fully implemented yet" << std::endl;
+        // Test record removal
+        int remove_result = tree->remove((const uchar *)data1, strlen(data1));
+        assert_equal(SBT_SUCCESS, remove_result, "Remove first record");
+        assert_equal((uint64_t)1, tree->get_record_count(), "Record count after first removal");
+        
+        // Verify removed record is gone
+        SBT_node *found_removed = tree->find_by_data((const uchar *)data1, strlen(data1));
+        assert_null(found_removed, "Removed record not found");
+        
+        // Verify remaining record still exists
+        SBT_node *found_remaining = tree->find_by_data((const uchar *)data2, strlen(data2));
+        assert_not_null(found_remaining, "Remaining record still exists");
+        
+        // Remove remaining record
+        remove_result = tree->remove((const uchar *)data2, strlen(data2));
+        assert_equal(SBT_SUCCESS, remove_result, "Remove second record");
+        assert_equal((uint64_t)0, tree->get_record_count(), "Record count after all removals");
+        
+        // Verify tree is empty
+        assert_true(tree->is_empty(), "Tree is empty after all removals");
         
         teardown();
     }

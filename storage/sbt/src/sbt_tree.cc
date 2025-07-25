@@ -200,14 +200,12 @@ SBT_node *SBT_tree::remove_node(SBT_node *node, const uchar *data, uint length) 
     // Case 2: Node has only right child
     if (!node->left) {
       SBT_node *right_child = node->right;
-      update_size(right_child);
       return right_child;
     }
     
     // Case 3: Node has only left child
     if (!node->right) {
       SBT_node *left_child = node->left;
-      update_size(left_child);
       return left_child;
     }
     
@@ -227,15 +225,27 @@ SBT_node *SBT_tree::remove_node(SBT_node *node, const uchar *data, uint length) 
     
     // Remove the successor from right subtree
     node->right = remove_node(node->right, successor->data, successor->data_length);
+    
+    // Update size and maintain SBT property after removing successor
+    update_size(node);
+    // After removing from right subtree, maintain both directions
+    node = maintain(node, true);
+    node = maintain(node, false);
+    return node;
   } else {
     // Recursively search in left and right subtrees
     node->left = remove_node(node->left, data, length);
     node->right = remove_node(node->right, data, length);
+    
+    // Update size
+    update_size(node);
+    
+    // After recursive removal, maintain both directions
+    node = maintain(node, false);
+    node = maintain(node, true);
+    
+    return node;
   }
-
-  // Update size and maintain SBT property
-  update_size(node);
-  return maintain(node, false); // Maintain both directions
 }
 
 SBT_node *SBT_tree::maintain(SBT_node *node, bool flag) {
@@ -268,7 +278,7 @@ SBT_node *SBT_tree::maintain(SBT_node *node, bool flag) {
   }
 
   // After rotation, recursively maintain both subtrees
-  // This is crucial for SBT correctness
+  // This is crucial for SBT correctness after deletion
   if (node->left) {
     node->left = maintain(node->left, false);
   }
