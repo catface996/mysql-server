@@ -65,5 +65,5 @@ ENDIF()
 
 # Add unit tests if enabled
 IF(WITH_UNIT_TESTS)
-  ADD_SUBDIRECTORY(unittest)
+  ADD_SUBDIRECTORY(tests/gtest)
 ENDIF()

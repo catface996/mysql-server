@@ -32,10 +32,10 @@ INCLUDE_DIRECTORIES(
 
 # SBT source files (needed for testing)
 SET(SBT_SOURCES
-  ../src/sbt_tree.cc
-  ../src/sbt_file.cc
-  ../src/sbt_share.cc
-  ../src/sbt_common.cc
+  ../../src/sbt_tree.cc
+  ../../src/sbt_file.cc
+  ../../src/sbt_share.cc
+  ../../src/sbt_common.cc
 )
 
 # Test sources

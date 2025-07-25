@@ -169,15 +169,20 @@ SBT_node *SBT_tree::insert_node(SBT_node *node, const uchar *data, uint length,
   }
 
   // Insert based on insert_id for SBT ordering
+  // Since insert_id is always increasing, new nodes go to the right
   if (insert_id < node->insert_id) {
     node->left = insert_node(node->left, data, length, insert_id);
+    // Update size after insertion
+    update_size(node);
+    // Maintain SBT property - left subtree was modified
+    return maintain(node, false);
   } else {
     node->right = insert_node(node->right, data, length, insert_id);
+    // Update size after insertion
+    update_size(node);
+    // Maintain SBT property - right subtree was modified
+    return maintain(node, true);
   }
-
-  // Update size and maintain SBT property
-  update_size(node);
-  return maintain(node, insert_id >= node->insert_id);
 }
 
 SBT_node *SBT_tree::remove_node(SBT_node *node, const uchar *data, uint length) {
@@ -237,45 +242,53 @@ SBT_node *SBT_tree::maintain(SBT_node *node, bool flag) {
   if (!node) return node;
 
   if (!flag) {
-    // Left subtree was modified
-    if (node->left && node->left->left && 
-        get_size(node->left->left) > get_size(node->right)) {
+    // Left subtree was modified - check for violations
+    if (node->left && get_size(node->left->left) > get_size(node->right)) {
+      // Case 1: Left-Left case
       node = rotate_right(node);
-    } else if (node->left && node->left->right && 
-               get_size(node->left->right) > get_size(node->right)) {
+    } else if (node->left && get_size(node->left->right) > get_size(node->right)) {
+      // Case 2: Left-Right case
       node->left = rotate_left(node->left);
       node = rotate_right(node);
     } else {
-      return node;
+      return node; // No violation, no need to maintain further
     }
   } else {
-    // Right subtree was modified
-    if (node->right && node->right->right && 
-        get_size(node->right->right) > get_size(node->left)) {
+    // Right subtree was modified - check for violations
+    if (node->right && get_size(node->right->right) > get_size(node->left)) {
+      // Case 3: Right-Right case
       node = rotate_left(node);
-    } else if (node->right && node->right->left && 
-               get_size(node->right->left) > get_size(node->left)) {
+    } else if (node->right && get_size(node->right->left) > get_size(node->left)) {
+      // Case 4: Right-Left case
       node->right = rotate_right(node->right);
       node = rotate_left(node);
     } else {
-      return node;
+      return node; // No violation, no need to maintain further
     }
   }
 
-  // Recursively maintain children
-  node->left = maintain(node->left, false);
-  node->right = maintain(node->right, true);
+  // After rotation, recursively maintain both subtrees
+  // This is crucial for SBT correctness
+  if (node->left) {
+    node->left = maintain(node->left, false);
+  }
+  if (node->right) {
+    node->right = maintain(node->right, true);
+  }
+  
   return node;
 }
 
 SBT_node *SBT_tree::rotate_left(SBT_node *node) {
-  if (!node || !node->right) return node;
+  if (!node || !node->right) {
+    return node;
+  }
 
   SBT_node *new_root = node->right;
   node->right = new_root->left;
   new_root->left = node;
 
-  // Update sizes
+  // Update sizes - order matters: update child first, then parent
   update_size(node);
   update_size(new_root);
 
@@ -283,13 +296,15 @@ SBT_node *SBT_tree::rotate_left(SBT_node *node) {
 }
 
 SBT_node *SBT_tree::rotate_right(SBT_node *node) {
-  if (!node || !node->left) return node;
+  if (!node || !node->left) {
+    return node;
+  }
 
   SBT_node *new_root = node->left;
   node->left = new_root->right;
   new_root->right = node;
 
-  // Update sizes
+  // Update sizes - order matters: update child first, then parent
   update_size(node);
   update_size(new_root);
 

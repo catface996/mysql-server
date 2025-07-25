@@ -1,25 +1,34 @@
-# SBT Storage Engine - Ignore compiled test executables
+# SBT Storage Engine - Build artifacts
+
+# Test build directory
+tests/build/
+
+# Legacy test executables (now moved to tests/)
 test_sbt_basic
 test_sbt_advanced
+test_insertion_standalone
+verify_unit_tests
 
-# Ignore other common build artifacts
+# Build artifacts
+build/
 *.o
 *.so
 *.dylib
 *.a
 *.exe
+*.dSYM/
 
-# Ignore temporary files
+# Temporary files
 *.tmp
 *.temp
 *~
 
-# Ignore IDE files
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Ignore OS files
+# OS files
 .DS_Store
 Thumbs.db
