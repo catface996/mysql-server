@@ -82,7 +82,7 @@
   - _需求: 8.1, 8.3_
 
 - [ ] 5. 实现MySQL Handler接口
-- [ ] 5.1 实现ha_sbt类的基础结构
+- [x] 5.1 实现ha_sbt类的基础结构
   - 编写ha_sbt类的构造和析构函数
   - 实现table_type和table_flags方法
   - 设置存储引擎的基本属性

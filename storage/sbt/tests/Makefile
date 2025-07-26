@@ -15,7 +15,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Standalone tests
-STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone
+STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone test_ha_sbt_structure test_task_5_1_verification
 STANDALONE_TARGETS = $(addprefix $(BUILD_DIR)/, $(STANDALONE_TESTS))
 
 $(BUILD_DIR)/test_insertion_standalone: $(STANDALONE_DIR)/test_insertion_standalone.cc | $(BUILD_DIR)
@@ -36,8 +36,14 @@ $(BUILD_DIR)/test_traversal_order_standalone: $(STANDALONE_DIR)/test_traversal_o
 $(BUILD_DIR)/test_sbt_share_standalone: $(STANDALONE_DIR)/test_sbt_share_standalone.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
 
+$(BUILD_DIR)/test_ha_sbt_structure: $(STANDALONE_DIR)/test_ha_sbt_structure.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_task_5_1_verification: $(STANDALONE_DIR)/test_task_5_1_verification.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
 # Integration tests
-INTEGRATION_TESTS = verify_unit_tests test_sbt_basic test_search_traversal_integration
+INTEGRATION_TESTS = verify_unit_tests test_sbt_basic test_search_traversal_integration test_ha_sbt_basic
 INTEGRATION_TARGETS = $(addprefix $(BUILD_DIR)/, $(INTEGRATION_TESTS))
 
 $(BUILD_DIR)/verify_unit_tests: $(INTEGRATION_DIR)/verify_unit_tests.cc | $(BUILD_DIR)
@@ -47,6 +53,9 @@ $(BUILD_DIR)/test_sbt_basic: $(INTEGRATION_DIR)/test_sbt_basic.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 $(BUILD_DIR)/test_search_traversal_integration: $(INTEGRATION_DIR)/test_search_traversal_integration.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_ha_sbt_basic: $(INTEGRATION_DIR)/test_ha_sbt_basic.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 # Performance tests
@@ -124,6 +133,15 @@ test_search_traversal_integration: $(BUILD_DIR)/test_search_traversal_integratio
 
 test_sbt_share_standalone: $(BUILD_DIR)/test_sbt_share_standalone
 	./$(BUILD_DIR)/test_sbt_share_standalone
+
+test_ha_sbt_basic: $(BUILD_DIR)/test_ha_sbt_basic
+	./$(BUILD_DIR)/test_ha_sbt_basic
+
+test_ha_sbt_structure: $(BUILD_DIR)/test_ha_sbt_structure
+	./$(BUILD_DIR)/test_ha_sbt_structure
+
+test_task_5_1_verification: $(BUILD_DIR)/test_task_5_1_verification
+	./$(BUILD_DIR)/test_task_5_1_verification
 
 # Clean
 clean:

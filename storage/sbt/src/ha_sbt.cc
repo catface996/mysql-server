@@ -123,8 +123,7 @@ ha_sbt::ha_sbt(handlerton *hton, TABLE_SHARE *table_arg)
       share(nullptr),
       current_node(nullptr),
       scan_initialized(false) {
-  // Initialize lock data
-  // TODO: Initialize lock data properly
+  // Lock data will be initialized in open() when share is available
 }
 
 /** Destructor */
@@ -151,7 +150,8 @@ int ha_sbt::open(const char *name, int mode, uint test_if_locked,
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);
   }
 
-  // TODO: Initialize lock data with share's lock
+  // Initialize lock data with share's lock
+  thr_lock_data_init(share->get_lock(), &lock, nullptr);
 
   // Open table data
   int error = share->open_table();
