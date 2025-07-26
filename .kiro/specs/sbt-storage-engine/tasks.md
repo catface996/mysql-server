@@ -13,6 +13,7 @@
   - 创建内存管理相关的辅助函数
   - 编写基础数据结构的单元测试，验证节点创建和内存管理的正确性
   - 创建独立测试验证SBT_tree的构造、析构和基本属性
+  - **验证报告**: [task_2_1_verification_report.md](../../storage/sbt/verification/task_2_1_verification_report.md)
   - _需求: 2.2, 6.1_
 
 - [x] 2.2 实现SBT树的插入操作
@@ -183,6 +184,7 @@
   - 编写SBT算法的单元测试
   - 测试插入、删除、查找操作的正确性
   - 验证树平衡性质的维护
+  - **验证报告**: [task_8_1_verification_report.md](../../storage/sbt/verification/task_8_1_verification_report.md)
   - _需求: 2.1, 2.2, 3.1, 4.1, 5.1_
 
 - [ ] 8.2 创建MySQL集成测试
@@ -192,6 +194,7 @@
   - 测试存储引擎的基本信息查询（版本、支持特性等）
   - 验证handlerton结构的正确注册和初始化
   - 创建集成测试脚本验证插件在MySQL中的激活状态
+  - **验证报告**: [task_8_2_1_verification_report.md](../../storage/sbt/verification/task_8_2_1_verification_report.md)
   - _需求: 6.1, 8.1, 8.2_
 
 - [x] 8.2.2 验证表的创建和删除操作
@@ -202,6 +205,7 @@
   - 测试重复创建和删除表的错误处理
   - 验证表元数据在MySQL系统表中的正确记录
   - 创建集成测试脚本验证表生命周期管理
+  - **验证报告**: [task_8_2_2_verification_report.md](../../storage/sbt/verification/task_8_2_2_verification_report.md)
   - _需求: 1.1, 1.3, 5.2, 7.1, 7.2_
 
 - [x] 8.2.3 验证记录的插入操作
@@ -212,7 +216,7 @@
   - 验证插入操作的错误处理（重复键、数据类型错误等）
   - 测试大量数据插入的性能和稳定性
   - 创建集成测试脚本验证插入功能的完整性
-  - **验证报告**: [task_8_2_3_verification_report.md](../../storage/sbt/tests/mysql_integration/task_8_2_3_verification_report.md)
+  - **验证报告**: [task_8_2_3_verification_report.md](../../storage/sbt/verification/task_8_2_3_verification_report.md)
   - _需求: 2.1, 2.2, 2.3, 5.4_
 
 - [ ] 8.2.4 验证记录的查询操作
