@@ -15,7 +15,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Standalone tests
-STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced
+STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone
 STANDALONE_TARGETS = $(addprefix $(BUILD_DIR)/, $(STANDALONE_TESTS))
 
 $(BUILD_DIR)/test_insertion_standalone: $(STANDALONE_DIR)/test_insertion_standalone.cc | $(BUILD_DIR)
@@ -27,14 +27,23 @@ $(BUILD_DIR)/test_deletion_standalone: $(STANDALONE_DIR)/test_deletion_standalon
 $(BUILD_DIR)/test_deletion_advanced: $(STANDALONE_DIR)/test_deletion_advanced.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
+$(BUILD_DIR)/test_search_traversal_standalone: $(STANDALONE_DIR)/test_search_traversal_standalone.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_traversal_order_standalone: $(STANDALONE_DIR)/test_traversal_order_standalone.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
 # Integration tests
-INTEGRATION_TESTS = verify_unit_tests test_sbt_basic
+INTEGRATION_TESTS = verify_unit_tests test_sbt_basic test_search_traversal_integration
 INTEGRATION_TARGETS = $(addprefix $(BUILD_DIR)/, $(INTEGRATION_TESTS))
 
 $(BUILD_DIR)/verify_unit_tests: $(INTEGRATION_DIR)/verify_unit_tests.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 $(BUILD_DIR)/test_sbt_basic: $(INTEGRATION_DIR)/test_sbt_basic.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_search_traversal_integration: $(INTEGRATION_DIR)/test_search_traversal_integration.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 # Performance tests
@@ -101,6 +110,15 @@ test_sbt_basic: $(BUILD_DIR)/test_sbt_basic
 test_sbt_advanced: $(BUILD_DIR)/test_sbt_advanced
 	./$(BUILD_DIR)/test_sbt_advanced
 
+test_search_traversal_standalone: $(BUILD_DIR)/test_search_traversal_standalone
+	./$(BUILD_DIR)/test_search_traversal_standalone
+
+test_traversal_order_standalone: $(BUILD_DIR)/test_traversal_order_standalone
+	./$(BUILD_DIR)/test_traversal_order_standalone
+
+test_search_traversal_integration: $(BUILD_DIR)/test_search_traversal_integration
+	./$(BUILD_DIR)/test_search_traversal_integration
+
 # Clean
 clean:
 	rm -rf $(BUILD_DIR)
@@ -124,9 +142,12 @@ help:
 	@echo "  test_insertion_standalone - Build and run insertion test"
 	@echo "  test_deletion_standalone - Build and run deletion test"
 	@echo "  test_deletion_advanced - Build and run advanced deletion test"
+	@echo "  test_search_traversal_standalone - Build and run search/traversal test"
+	@echo "  test_traversal_order_standalone - Build and run traversal order test"
 	@echo "  verify_unit_tests   - Build and run unit test verification"
 	@echo "  test_sbt_basic      - Build and run basic tests"
 	@echo "  test_sbt_advanced   - Build and run advanced tests"
+	@echo "  test_search_traversal_integration - Build and run search/traversal integration test"
 	@echo ""
 	@echo "  clean               - Remove build artifacts"
 	@echo "  help                - Show this help message"
