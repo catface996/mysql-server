@@ -218,24 +218,44 @@ int ha_sbt::close() {
 int ha_sbt::write_row(uchar *buf) {
   DBUG_ENTER("ha_sbt::write_row");
   
+  // Validate handler state
   if (!share || !share->get_tree()) {
+    sbt_log_error("Invalid handler state for write_row operation");
     DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
   }
+  
+  // Validate input buffer
+  if (!buf) {
+    sbt_log_error("Invalid record buffer for write_row operation");
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+  }
 
-  // Pack row data
+  sbt_log_debug("Writing new record to SBT table");
+
+  // Pack row data from MySQL format to SBT format
   uchar *packed_data = nullptr;
   uint packed_length = 0;
   int error = pack_row(buf, &packed_data, &packed_length);
   if (error) {
+    sbt_log_error("Failed to pack row data for insertion, error: %d", error);
     DBUG_RETURN(error);
   }
 
-  // Insert into tree
+  // Insert the packed data into the SBT tree
   error = share->get_tree()->insert(packed_data, packed_length);
   
-  // Free packed data
+  // Free the packed data buffer (always, regardless of insert result)
   if (packed_data) {
     sbt_free(packed_data);
+    packed_data = nullptr;
+  }
+  
+  // Check insert result and log accordingly
+  if (error == SBT_SUCCESS) {
+    sbt_log_debug("Successfully inserted record into SBT tree, total records: %llu", 
+                  share->get_tree()->get_record_count());
+  } else {
+    sbt_log_error("Failed to insert record into SBT tree, error: %d", error);
   }
 
   DBUG_RETURN(sbt_error_to_mysql_error(error));
@@ -459,32 +479,75 @@ THR_LOCK_DATA **ha_sbt::store_lock(THD *thd, THR_LOCK_DATA **to,
   return to;
 }
 
-/** Pack row data - placeholder implementation */
+/** Pack row data from MySQL format to SBT format */
 int ha_sbt::pack_row(const uchar *record, uchar **packed_data, uint *packed_length) {
-  // Simple implementation: just copy the record
-  // In a real implementation, this would handle field packing, NULL values, etc.
+  DBUG_ENTER("ha_sbt::pack_row");
+  
+  // Validate input parameters
+  if (!record || !packed_data || !packed_length) {
+    sbt_log_error("Invalid parameters for pack_row");
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+  }
+  
+  // For SBT storage engine, we use a simple format:
+  // Just copy the MySQL record as-is since we don't support complex field types
+  // In a production implementation, this would handle:
+  // - Field-by-field packing
+  // - NULL value handling
+  // - Variable length fields
+  // - Character set conversion
+  // - Compression
   
   *packed_length = table->s->reclength;
   *packed_data = (uchar *)sbt_malloc(*packed_length);
   if (!*packed_data) {
-    return HA_ERR_OUT_OF_MEM;
+    sbt_log_error("Failed to allocate memory for packed data: %u bytes", *packed_length);
+    DBUG_RETURN(HA_ERR_OUT_OF_MEM);
   }
   
+  // Copy the record data
   memcpy(*packed_data, record, *packed_length);
-  return 0;
+  
+  sbt_log_debug("Packed row data: %u bytes", *packed_length);
+  DBUG_RETURN(0);
 }
 
-/** Unpack row data - placeholder implementation */
+/** Unpack row data from SBT format to MySQL format */
 int ha_sbt::unpack_row(const uchar *packed_data, uint packed_length, uchar *record) {
-  // Simple implementation: just copy the data
-  // In a real implementation, this would handle field unpacking, NULL values, etc.
+  DBUG_ENTER("ha_sbt::unpack_row");
   
-  if (packed_length > table->s->reclength) {
-    return HA_ERR_CRASHED_ON_USAGE;
+  // Validate input parameters
+  if (!packed_data || !record) {
+    sbt_log_error("Invalid parameters for unpack_row");
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
   }
   
+  // Validate packed data length
+  if (packed_length > table->s->reclength) {
+    sbt_log_error("Packed data length (%u) exceeds record length (%u)", 
+                  packed_length, table->s->reclength);
+    DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
+  }
+  
+  // For SBT storage engine, we use a simple format:
+  // Just copy the data as-is since we stored it in MySQL format
+  // In a production implementation, this would handle:
+  // - Field-by-field unpacking
+  // - NULL value restoration
+  // - Variable length field reconstruction
+  // - Character set conversion
+  // - Decompression
+  
+  // Copy the packed data to the record buffer
   memcpy(record, packed_data, packed_length);
-  return 0;
+  
+  // If packed length is less than record length, zero out the remaining bytes
+  if (packed_length < table->s->reclength) {
+    memset(record + packed_length, 0, table->s->reclength - packed_length);
+  }
+  
+  sbt_log_debug("Unpacked row data: %u bytes", packed_length);
+  DBUG_RETURN(0);
 }
 
 /** Get table file path */
