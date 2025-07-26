@@ -136,6 +136,27 @@ public:
    */
   bool is_empty() const { return root == nullptr; }
 
+  /** Allocate a new node (for deserialization)
+   * @return Pointer to allocated node, nullptr on failure
+   */
+  SBT_node *allocate_node();
+
+  /** Allocate memory from tree's memory pool
+   * @param[in] size Size of memory to allocate
+   * @return Pointer to allocated memory, nullptr on failure
+   */
+  void *allocate_memory(size_t size);
+
+  /** Set root node (for deserialization)
+   * @param[in] new_root New root node
+   */
+  void set_root(SBT_node *new_root);
+
+  /** Get root node (for serialization)
+   * @return Pointer to root node
+   */
+  SBT_node *get_root() const { return root; }
+
 private:
   /** Insert a node into the tree (recursive)
    * @param[in] node Current node (may be nullptr)

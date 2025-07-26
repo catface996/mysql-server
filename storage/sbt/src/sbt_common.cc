@@ -35,6 +35,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "sql/log.h"
 #include "sql/mysqld.h"
 #include "my_sys.h"
+#include <sys/time.h>
+#include <cstdarg>
 
 /** Convert SBT error to MySQL error code */
 int sbt_error_to_mysql_error(int sbt_error) {
@@ -119,4 +121,84 @@ int sbt_data_compare(const uchar *data1, uint length1,
   
   // Compare data content
   return memcmp(data1, data2, length1);
+}
+
+/** CRC32 lookup table for polynomial 0xEDB88320 */
+static uint32_t crc32_table[256];
+static bool crc32_table_initialized = false;
+
+/** Initialize CRC32 lookup table */
+static void init_crc32_table() {
+  if (crc32_table_initialized) {
+    return;
+  }
+  
+  const uint32_t polynomial = 0xEDB88320;
+  
+  for (uint32_t i = 0; i < 256; i++) {
+    uint32_t crc = i;
+    for (int j = 0; j < 8; j++) {
+      if (crc & 1) {
+        crc = (crc >> 1) ^ polynomial;
+      } else {
+        crc >>= 1;
+      }
+    }
+    crc32_table[i] = crc;
+  }
+  
+  crc32_table_initialized = true;
+}
+
+/** Calculate CRC32 checksum */
+uint32_t sbt_crc32(const uchar *data, size_t length) {
+  init_crc32_table();
+  
+  uint32_t crc = 0xFFFFFFFF;
+  
+  for (size_t i = 0; i < length; i++) {
+    uint8_t table_index = (crc ^ data[i]) & 0xFF;
+    crc = (crc >> 8) ^ crc32_table[table_index];
+  }
+  
+  return crc ^ 0xFFFFFFFF;
+}
+
+/** Update CRC32 checksum with additional data */
+uint32_t sbt_crc32_update(uint32_t crc, const uchar *data, size_t length) {
+  init_crc32_table();
+  
+  // Convert back to working CRC
+  crc ^= 0xFFFFFFFF;
+  
+  for (size_t i = 0; i < length; i++) {
+    uint8_t table_index = (crc ^ data[i]) & 0xFF;
+    crc = (crc >> 8) ^ crc32_table[table_index];
+  }
+  
+  return crc ^ 0xFFFFFFFF;
+}
+
+/** Get current time in microseconds since epoch */
+uint64_t sbt_get_current_time() {
+  struct timeval tv;
+  if (gettimeofday(&tv, nullptr) != 0) {
+    return 0;
+  }
+  
+  return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
+/** Align offset to specified boundary */
+uint64_t sbt_align_offset(uint64_t offset, uint32_t alignment) {
+  if (alignment == 0) {
+    return offset;
+  }
+  
+  uint64_t remainder = offset % alignment;
+  if (remainder == 0) {
+    return offset;
+  }
+  
+  return offset + (alignment - remainder);
 }

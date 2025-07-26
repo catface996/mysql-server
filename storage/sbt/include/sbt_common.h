@@ -75,14 +75,36 @@ typedef uint64_t sbt_insert_id_t;
 
 // SBT File Header Structure
 struct SBT_header {
-  char magic[SBT_FILE_MAGIC_SIZE];  // File magic number
+  char magic[SBT_FILE_MAGIC_SIZE];  // File magic number "SBT\0"
   uint32_t version;                 // File format version
   uint64_t record_count;            // Number of records in the tree
   uint64_t next_insert_id;          // Next insert ID to use
-  uint64_t tree_root_offset;        // Offset to serialized tree data
-  uint32_t checksum;                // Header checksum
-  char reserved[32];                // Reserved for future use
+  uint64_t tree_root_offset;        // Offset to serialized tree data in file
+  uint32_t tree_data_size;          // Size of serialized tree data
+  uint32_t header_size;             // Size of this header structure
+  uint32_t checksum;                // Header checksum (CRC32)
+  uint64_t created_time;            // File creation timestamp
+  uint64_t modified_time;           // Last modification timestamp
+  char reserved[16];                // Reserved for future use
 };
+
+// SBT Serialized Node Structure (on disk format)
+struct SBT_serialized_node {
+  uint32_t has_node;                // 1 if node exists, 0 for null
+  uint64_t insert_id;               // Insert ID for ordering
+  uint32_t data_length;             // Length of record data
+  uint32_t size;                    // Subtree size
+  // Followed by:
+  // - uchar data[data_length]      // Record data
+  // - SBT_serialized_node left     // Left subtree (recursive)
+  // - SBT_serialized_node right    // Right subtree (recursive)
+};
+
+// File format constants
+#define SBT_HEADER_SIZE sizeof(SBT_header)
+#define SBT_SERIALIZED_NODE_HEADER_SIZE sizeof(SBT_serialized_node)
+#define SBT_MAX_RECORD_SIZE (64 * 1024)  // 64KB max record size
+#define SBT_FILE_ALIGNMENT 8             // File data alignment
 
 // Utility functions
 int sbt_error_to_mysql_error(int sbt_error);
@@ -97,5 +119,15 @@ void *sbt_realloc(void *ptr, size_t size);
 // String comparison for record data
 int sbt_data_compare(const uchar *data1, uint length1, 
                      const uchar *data2, uint length2);
+
+// CRC32 checksum calculation
+uint32_t sbt_crc32(const uchar *data, size_t length);
+uint32_t sbt_crc32_update(uint32_t crc, const uchar *data, size_t length);
+
+// Time utilities
+uint64_t sbt_get_current_time();
+
+// File alignment utilities
+uint64_t sbt_align_offset(uint64_t offset, uint32_t alignment);
 
 #endif /* sbt_common_h */

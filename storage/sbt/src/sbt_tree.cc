@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "../include/sbt_common.h"
 #include "my_alloc.h"
 #include "mysql/psi/mysql_memory.h"
+#include "my_sys.h"
 
 /** Constructor */
 SBT_tree::SBT_tree() 
@@ -413,4 +414,23 @@ SBT_node *SBT_tree::find_next_by_insert_id(SBT_node *node, sbt_insert_id_t curre
   }
 
   return result;
+}
+
+/** Allocate a new node for deserialization */
+SBT_node *SBT_tree::allocate_node() {
+  SBT_node *node = (SBT_node *)mem_root.Alloc(sizeof(SBT_node));
+  if (node) {
+    memset(node, 0, sizeof(SBT_node));
+  }
+  return node;
+}
+
+/** Allocate memory from tree's memory pool */
+void *SBT_tree::allocate_memory(size_t size) {
+  return mem_root.Alloc(size);
+}
+
+/** Set root node for deserialization */
+void SBT_tree::set_root(SBT_node *new_root) {
+  root = new_root;
 }
