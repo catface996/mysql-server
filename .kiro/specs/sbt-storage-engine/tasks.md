@@ -212,6 +212,7 @@
   - 验证插入操作的错误处理（重复键、数据类型错误等）
   - 测试大量数据插入的性能和稳定性
   - 创建集成测试脚本验证插入功能的完整性
+  - **验证报告**: [task_8_2_3_verification_report.md](../../storage/sbt/tests/mysql_integration/task_8_2_3_verification_report.md)
   - _需求: 2.1, 2.2, 2.3, 5.4_
 
 - [ ] 8.2.4 验证记录的查询操作
