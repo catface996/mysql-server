@@ -116,7 +116,7 @@ int SBT_file::create(const char *name) {
 
   // Success - transfer ownership to this object
   fd = file_guard.release();
-  file_name = name_guard.release();
+  file_name = static_cast<char*>(name_guard.release());
   is_open = true;
 
   return SBT_SUCCESS;
@@ -171,7 +171,7 @@ int SBT_file::open(const char *name) {
 
   // Success - transfer ownership to this object
   fd = file_guard.release();
-  file_name = name_guard.release();
+  file_name = static_cast<char*>(name_guard.release());
   is_open = true;
 
   return SBT_SUCCESS;
@@ -196,7 +196,7 @@ int SBT_file::load_tree(SBT_tree *tree) {
   // Save original tree state for rollback
   SBT_node *original_root = tree->get_root();
   sbt_insert_id_t original_next_id = tree->get_next_insert_id();
-  uint64_t original_record_count = tree->get_record_count();
+  [[maybe_unused]] uint64_t original_record_count = tree->get_record_count();
   
   SBT_transaction_guard transaction([&]() {
     // Rollback tree state on failure

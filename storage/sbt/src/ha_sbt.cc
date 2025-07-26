@@ -54,13 +54,13 @@ static long sbt_rows_read = 0;
 
 // Status variable definitions
 static SHOW_VAR sbt_status_variables[] = {
-  {"sbt_tables_created", (char*)&sbt_tables_created, SHOW_LONG},
-  {"sbt_tables_opened", (char*)&sbt_tables_opened, SHOW_LONG},
-  {"sbt_rows_inserted", (char*)&sbt_rows_inserted, SHOW_LONG},
-  {"sbt_rows_updated", (char*)&sbt_rows_updated, SHOW_LONG},
-  {"sbt_rows_deleted", (char*)&sbt_rows_deleted, SHOW_LONG},
-  {"sbt_rows_read", (char*)&sbt_rows_read, SHOW_LONG},
-  {0, 0, SHOW_UNDEF}
+  {"sbt_tables_created", (char*)&sbt_tables_created, SHOW_LONG, SHOW_SCOPE_GLOBAL},
+  {"sbt_tables_opened", (char*)&sbt_tables_opened, SHOW_LONG, SHOW_SCOPE_GLOBAL},
+  {"sbt_rows_inserted", (char*)&sbt_rows_inserted, SHOW_LONG, SHOW_SCOPE_GLOBAL},
+  {"sbt_rows_updated", (char*)&sbt_rows_updated, SHOW_LONG, SHOW_SCOPE_GLOBAL},
+  {"sbt_rows_deleted", (char*)&sbt_rows_deleted, SHOW_LONG, SHOW_SCOPE_GLOBAL},
+  {"sbt_rows_read", (char*)&sbt_rows_read, SHOW_LONG, SHOW_SCOPE_GLOBAL},
+  {0, 0, SHOW_UNDEF, SHOW_SCOPE_UNDEF}
 };
 
 // Storage engine plugin declaration
@@ -191,7 +191,7 @@ int ha_sbt::open(const char *name, int mode, uint test_if_locked,
     sbt_log_error("Failed to open table data: %s, error: %d", name, error);
     SBT_share::release_share(share);
     share = nullptr;
-    DBUG_RETURN(sbt_error_to_mysql_error(error));
+    DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
   }
   
   // Initialize scan state
@@ -283,7 +283,7 @@ int ha_sbt::write_row(uchar *buf) {
     sbt_log_error("Failed to insert record into SBT tree, error: %d", error);
   }
 
-  DBUG_RETURN(sbt_error_to_mysql_error(error));
+  DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
 }
 
 /** Update row */
@@ -322,7 +322,7 @@ int ha_sbt::update_row(const uchar *old_data, uchar *new_data) {
   if (old_packed) sbt_free(old_packed);
   if (new_packed) sbt_free(new_packed);
 
-  DBUG_RETURN(sbt_error_to_mysql_error(error));
+  DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
 }
 
 /** Delete row */
@@ -354,7 +354,7 @@ int ha_sbt::delete_row(const uchar *buf) {
     sbt_free(packed_data);
   }
 
-  DBUG_RETURN(sbt_error_to_mysql_error(error));
+  DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
 }
 
 /** Initialize random scan */
@@ -463,7 +463,7 @@ int ha_sbt::create(const char *name, TABLE *table_arg,
   int error = file.create(file_path);
   if (error != SBT_SUCCESS) {
     sbt_log_error("Failed to create table file: %s, error: %d", file_path, error);
-    DBUG_RETURN(sbt_error_to_mysql_error(error));
+    DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
   }
   
   sbt_log_info("Successfully created table file: %s", file_path);
@@ -497,7 +497,7 @@ int ha_sbt::delete_table(const char *name, const dd::Table *table_def) {
   int error = SBT_file::delete_file(file_path);
   if (error != SBT_SUCCESS) {
     sbt_log_error("Failed to delete table file: %s, error: %d", file_path, error);
-    DBUG_RETURN(sbt_error_to_mysql_error(error));
+    DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
   }
   
   sbt_log_info("Successfully deleted table file: %s", file_path);

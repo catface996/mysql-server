@@ -40,7 +40,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "thr_lock.h"
 #include "mysql/psi/mysql_mutex.h"
 #include "my_sys.h"
-#include "my_hash.h"
+#include "my_sys.h"
 
 /** SBT Share Class
  * 
@@ -56,6 +56,7 @@ private:
   SBT_tree *tree;                 // Shared tree structure
   SBT_file *file;                 // File manager
   mysql_mutex_t mutex;            // Mutex for thread safety
+  SBT_share *next;                // Next share in list
 
   // Simple share management (no hash table for now)
   static mysql_mutex_t sbt_mutex;
@@ -155,18 +156,7 @@ public:
   int delete_table(const char *file_name);
 
 private:
-  /** Hash key function for MySQL hash table
-   * @param[in] record Hash table record (SBT_share*)
-   * @param[out] length Length of key
-   * @param[in] not_used Unused parameter
-   * @return Pointer to key data
-   */
-  static uchar *sbt_hash_key(const uchar *record, size_t *length, my_bool not_used);
-
-  /** Free function for hash table entries
-   * @param[in] element Element to free
-   */
-  static void sbt_hash_free(void *element);
+  // Hash functions no longer needed with simplified implementation
 
   /** Increment reference count
    */

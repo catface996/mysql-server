@@ -65,6 +65,9 @@ run_test "Task 5.6: Record Deletion Operations" "make test_task_5_6_verification
 run_test "Task 5.7: Full Table Scan Functionality" "make test_full_table_scan_standalone && ./test_full_table_scan_standalone"
 run_test "Task 6.1: Handlerton Structure Implementation" "make test_task_6_1_verification && ./test_task_6_1_verification"
 
+# Run MySQL Integration tests
+run_test "Task 8.2.1: MySQL Storage Engine Plugin Integration and Activation" "../integration/test_mysql_integration_8_2_1.sh"
+
 # Run comprehensive regression test
 run_test "Comprehensive Integration Test" "g++ -std=c++17 -Wall -Wextra -O2 -o regression_test_all regression_test_all.cc && ./regression_test_all"
 

@@ -57,7 +57,7 @@ int sbt_error_to_mysql_error(sbt_error_t sbt_error) {
     case SBT_ERR_FILE_EXISTS:
       return HA_ERR_TABLE_EXIST;
     case SBT_ERR_FILE_PERMISSION:
-      return HA_ERR_NO_PERMISSION;
+      return HA_ERR_CRASHED_ON_USAGE;
     case SBT_ERR_FILE_CORRUPTED:
     case SBT_ERR_IO_ERROR:
       return HA_ERR_CRASHED_ON_USAGE;
@@ -205,12 +205,8 @@ void sbt_log_error(const char *format, ...) {
   char buffer[1024];
   vsnprintf(buffer, sizeof(buffer), format, args);
   
-  // Use MySQL logging system if available, otherwise stderr
-  #ifdef MYSQL_SERVER
-    LogErr(ERROR_LEVEL, ER_IB_MSG_GENERIC, "SBT", buffer);
-  #else
-    fprintf(stderr, "[ERROR] SBT: %s\n", buffer);
-  #endif
+  // Use stderr for logging
+  fprintf(stderr, "[ERROR] SBT: %s\n", buffer);
   
   va_end(args);
 }
@@ -223,11 +219,8 @@ void sbt_log_warning(const char *format, ...) {
   char buffer[1024];
   vsnprintf(buffer, sizeof(buffer), format, args);
   
-  #ifdef MYSQL_SERVER
-    LogErr(WARNING_LEVEL, ER_IB_MSG_GENERIC, "SBT", buffer);
-  #else
-    fprintf(stderr, "[WARNING] SBT: %s\n", buffer);
-  #endif
+  // Use stderr for logging
+  fprintf(stderr, "[WARNING] SBT: %s\n", buffer);
   
   va_end(args);
 }
@@ -240,11 +233,8 @@ void sbt_log_info(const char *format, ...) {
   char buffer[1024];
   vsnprintf(buffer, sizeof(buffer), format, args);
   
-  #ifdef MYSQL_SERVER
-    LogErr(INFORMATION_LEVEL, ER_IB_MSG_GENERIC, "SBT", buffer);
-  #else
-    printf("[INFO] SBT: %s\n", buffer);
-  #endif
+  // Use stdout for logging
+  printf("[INFO] SBT: %s\n", buffer);
   
   va_end(args);
 }
