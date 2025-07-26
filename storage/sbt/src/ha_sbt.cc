@@ -144,9 +144,22 @@ int ha_sbt::open(const char *name, int mode, uint test_if_locked,
                  const dd::Table *table_def) {
   DBUG_ENTER("ha_sbt::open");
   
+  // Validate input parameters
+  if (!name) {
+    sbt_log_error("Invalid table name for open operation");
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+  }
+  
+  // Check if table is already open
+  if (share) {
+    sbt_log_error("Table is already open: %s", name);
+    DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
+  }
+  
   // Get shared table information
   share = SBT_share::get_share(name);
   if (!share) {
+    sbt_log_error("Failed to get share for table: %s", name);
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);
   }
 
@@ -156,11 +169,17 @@ int ha_sbt::open(const char *name, int mode, uint test_if_locked,
   // Open table data
   int error = share->open_table();
   if (error != SBT_SUCCESS) {
+    sbt_log_error("Failed to open table data: %s, error: %d", name, error);
     SBT_share::release_share(share);
     share = nullptr;
     DBUG_RETURN(sbt_error_to_mysql_error(error));
   }
-
+  
+  // Initialize scan state
+  current_node = nullptr;
+  scan_initialized = false;
+  
+  sbt_log_info("Successfully opened table: %s", name);
   DBUG_RETURN(0);
 }
 
@@ -169,13 +188,28 @@ int ha_sbt::close() {
   DBUG_ENTER("ha_sbt::close");
 
   if (share) {
+    // End any active scan
+    if (scan_initialized) {
+      rnd_end();
+    }
+    
     // Save table data
-    share->close_table();
+    int error = share->close_table();
+    if (error != SBT_SUCCESS) {
+      sbt_log_error("Failed to close table data, error: %d", error);
+      // Continue with cleanup even if save failed
+    }
     
     // Release shared information
     SBT_share::release_share(share);
     share = nullptr;
+    
+    sbt_log_info("Successfully closed table");
   }
+  
+  // Reset handler state
+  current_node = nullptr;
+  scan_initialized = false;
 
   DBUG_RETURN(0);
 }
