@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "my_config.h"
 #include "../include/sbt_file.h"
 #include "../include/sbt_common.h"
+#include "../include/sbt_raii.h"
 #include "my_sys.h"
 #include "my_io.h"
 
@@ -53,28 +54,25 @@ SBT_file::~SBT_file() {
   }
 }
 
-/** Create new file with proper header initialization */
+/** Create new file with exception safety */
 int SBT_file::create(const char *name) {
   if (!name) {
     return SBT_ERR_INVALID_ARGUMENT;
   }
 
-  // Create new file with read/write permissions
-  fd = my_create(name, 0, O_RDWR | O_TRUNC, MYF(MY_WME));
-  if (fd < 0) {
+  // Use RAII file guard for automatic cleanup
+  SBT_file_guard file_guard(my_create(name, 0, O_RDWR | O_TRUNC, MYF(MY_WME)));
+  if (!file_guard.is_valid()) {
     return SBT_ERR_IO_ERROR;
   }
 
-  // Store file name
+  // Use RAII memory guard for file name
   size_t name_len = strlen(name);
-  file_name = (char *)sbt_malloc(name_len + 1);
-  if (!file_name) {
-    my_close(fd, MYF(0));
-    fd = -1;
+  SBT_memory_guard name_guard = sbt_make_memory_guard(name_len + 1);
+  if (!name_guard.is_valid()) {
     return SBT_ERR_OUT_OF_MEMORY;
   }
-  strcpy(file_name, name);
-  is_open = true;
+  strcpy(name_guard.get_as<char>(), name);
 
   // Initialize file header with proper values
   SBT_header header;
@@ -96,65 +94,85 @@ int SBT_file::create(const char *name) {
   header.created_time = current_time;
   header.modified_time = current_time;
   
+  // Temporarily set fd for header writing
+  fd = file_guard.get();
+  is_open = true;
+  
   // Write header to file
   int error = write_header(&header);
   if (error != SBT_SUCCESS) {
-    close();
+    fd = -1;
+    is_open = false;
     return error;
   }
 
   // Flush to ensure data is written
   error = flush();
   if (error != SBT_SUCCESS) {
-    close();
+    fd = -1;
+    is_open = false;
     return error;
   }
+
+  // Success - transfer ownership to this object
+  fd = file_guard.release();
+  file_name = name_guard.release();
+  is_open = true;
 
   return SBT_SUCCESS;
 }
 
-/** Open existing file with header validation */
+/** Open existing file with exception safety */
 int SBT_file::open(const char *name) {
   if (!name) {
     return SBT_ERR_INVALID_ARGUMENT;
   }
 
-  // Open existing file
-  fd = my_open(name, O_RDWR, MYF(MY_WME));
-  if (fd < 0) {
+  // Use RAII file guard for automatic cleanup
+  SBT_file_guard file_guard(my_open(name, O_RDWR, MYF(MY_WME)));
+  if (!file_guard.is_valid()) {
     return SBT_ERR_FILE_NOT_FOUND;
   }
 
-  // Store file name
+  // Use RAII memory guard for file name
   size_t name_len = strlen(name);
-  file_name = (char *)sbt_malloc(name_len + 1);
-  if (!file_name) {
-    my_close(fd, MYF(0));
-    fd = -1;
+  SBT_memory_guard name_guard = sbt_make_memory_guard(name_len + 1);
+  if (!name_guard.is_valid()) {
     return SBT_ERR_OUT_OF_MEMORY;
   }
-  strcpy(file_name, name);
+  strcpy(name_guard.get_as<char>(), name);
+
+  // Temporarily set fd for header reading
+  fd = file_guard.get();
   is_open = true;
 
   // Read and validate header
   SBT_header header;
   int error = read_header(&header);
   if (error != SBT_SUCCESS) {
-    close();
+    fd = -1;
+    is_open = false;
     return error;
   }
 
   // Validate file format version
   if (header.version != SBT_FILE_VERSION) {
-    close();
+    fd = -1;
+    is_open = false;
     return SBT_ERR_CORRUPTED_DATA;
   }
 
   // Validate header size
   if (header.header_size != SBT_HEADER_SIZE) {
-    close();
+    fd = -1;
+    is_open = false;
     return SBT_ERR_CORRUPTED_DATA;
   }
+
+  // Success - transfer ownership to this object
+  fd = file_guard.release();
+  file_name = name_guard.release();
+  is_open = true;
 
   return SBT_SUCCESS;
 }
@@ -169,11 +187,22 @@ int SBT_file::close() {
   return SBT_SUCCESS;
 }
 
-/** Load tree from file */
+/** Load tree from file with exception safety */
 int SBT_file::load_tree(SBT_tree *tree) {
   if (!tree || !is_open) {
     return SBT_ERR_INVALID_ARGUMENT;
   }
+
+  // Save original tree state for rollback
+  SBT_node *original_root = tree->get_root();
+  sbt_insert_id_t original_next_id = tree->get_next_insert_id();
+  uint64_t original_record_count = tree->get_record_count();
+  
+  SBT_transaction_guard transaction([&]() {
+    // Rollback tree state on failure
+    tree->set_root(original_root);
+    tree->set_next_insert_id(original_next_id);
+  });
 
   // Clear existing tree data
   tree->clear();
@@ -188,27 +217,27 @@ int SBT_file::load_tree(SBT_tree *tree) {
   // If no tree data, return success with empty tree
   if (header.tree_data_size == 0 || header.record_count == 0) {
     tree->set_next_insert_id(header.next_insert_id);
+    transaction.commit();
     return SBT_SUCCESS;
   }
 
-  // Allocate buffer for tree data
-  uchar *buffer = (uchar *)sbt_malloc(header.tree_data_size);
-  if (!buffer) {
+  // Use RAII memory guard for buffer
+  SBT_memory_guard buffer_guard = sbt_make_memory_guard(header.tree_data_size);
+  if (!buffer_guard.is_valid()) {
     return SBT_ERR_OUT_OF_MEMORY;
   }
 
   // Read tree data from file
-  if (my_pread(fd, buffer, header.tree_data_size, header.tree_root_offset, MYF(MY_NABP)) != 0) {
-    sbt_free(buffer);
+  if (my_pread(fd, buffer_guard.get_as<uchar>(), header.tree_data_size, 
+               header.tree_root_offset, MYF(MY_NABP)) != 0) {
     return SBT_ERR_IO_ERROR;
   }
 
   // Deserialize tree from buffer
   uint offset = 0;
   SBT_node *root = nullptr;
-  error = deserialize_tree(&root, buffer, offset, header.tree_data_size, tree);
-  
-  sbt_free(buffer);
+  error = deserialize_tree(&root, buffer_guard.get_as<uchar>(), offset, 
+                          header.tree_data_size, tree);
   
   if (error != SBT_SUCCESS) {
     return error;
@@ -218,10 +247,11 @@ int SBT_file::load_tree(SBT_tree *tree) {
   tree->set_root(root);
   tree->set_next_insert_id(header.next_insert_id);
 
+  transaction.commit();
   return SBT_SUCCESS;
 }
 
-/** Save tree to file */
+/** Save tree to file with exception safety */
 int SBT_file::save_tree(SBT_tree *tree) {
   if (!tree || !is_open) {
     return SBT_ERR_INVALID_ARGUMENT;
@@ -248,37 +278,50 @@ int SBT_file::save_tree(SBT_tree *tree) {
     return write_header(&header);
   }
 
-  // Allocate buffer for serialization
-  uchar *buffer = (uchar *)sbt_malloc(buffer_size);
-  if (!buffer) {
+  // Use RAII memory guard for buffer
+  SBT_memory_guard buffer_guard = sbt_make_memory_guard(buffer_size);
+  if (!buffer_guard.is_valid()) {
     return SBT_ERR_OUT_OF_MEMORY;
   }
 
   // Serialize tree to buffer
   uint offset = 0;
-  int error = serialize_tree(tree->get_root(), buffer, offset, buffer_size);
+  int error = serialize_tree(tree->get_root(), buffer_guard.get_as<uchar>(), 
+                            offset, buffer_size);
   if (error != SBT_SUCCESS) {
-    sbt_free(buffer);
     return error;
   }
+
+  // Create backup of current file position for rollback
+  my_off_t original_pos = my_tell(fd, MYF(0));
+  
+  SBT_transaction_guard transaction([&]() {
+    // Attempt to restore file position on failure
+    if (original_pos != MY_FILEPOS_ERROR) {
+      my_seek(fd, original_pos, MY_SEEK_SET, MYF(0));
+    }
+  });
 
   // Write header first
   error = write_header(&header);
   if (error != SBT_SUCCESS) {
-    sbt_free(buffer);
     return error;
   }
 
   // Write tree data
-  if (my_pwrite(fd, buffer, buffer_size, header.tree_root_offset, MYF(MY_NABP)) != 0) {
-    sbt_free(buffer);
+  if (my_pwrite(fd, buffer_guard.get_as<uchar>(), buffer_size, 
+                header.tree_root_offset, MYF(MY_NABP)) != 0) {
     return SBT_ERR_IO_ERROR;
   }
 
-  sbt_free(buffer);
-
   // Flush to ensure data is written
-  return flush();
+  error = flush();
+  if (error != SBT_SUCCESS) {
+    return error;
+  }
+
+  transaction.commit();
+  return SBT_SUCCESS;
 }
 
 /** Delete file */

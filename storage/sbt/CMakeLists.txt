@@ -40,6 +40,7 @@ SET(SBT_SOURCES
   src/sbt_file.cc
   src/sbt_share.cc
   src/sbt_common.cc
+  src/sbt_raii.cc
 )
 
 # Header files
@@ -49,6 +50,7 @@ SET(SBT_HEADERS
   include/sbt_file.h
   include/sbt_share.h
   include/sbt_common.h
+  include/sbt_raii.h
 )
 
 # Create the SBT storage engine library

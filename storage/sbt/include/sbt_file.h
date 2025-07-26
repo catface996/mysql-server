@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 #include "sbt_common.h"
 #include "sbt_tree.h"
+#include "sbt_raii.h"
 #include "my_io.h"
 
 /** SBT File Manager Class

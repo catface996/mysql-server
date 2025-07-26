@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "my_config.h"
 #include "../include/sbt_tree.h"
 #include "../include/sbt_common.h"
+#include "../include/sbt_raii.h"
 #include "my_alloc.h"
 #include "mysql/psi/mysql_memory.h"
 #include "my_sys.h"
@@ -50,20 +51,33 @@ SBT_tree::~SBT_tree() {
   clear();
 }
 
-/** Insert record */
+/** Insert record with exception safety */
 int SBT_tree::insert(const uchar *data, uint length) {
   if (!data || length == 0) {
     return SBT_ERR_INVALID_ARGUMENT;
   }
 
-  sbt_insert_id_t insert_id = next_insert_id++;
-  root = insert_node(root, data, length, insert_id);
+  // Create transaction guard for rollback on failure
+  sbt_insert_id_t original_insert_id = next_insert_id;
+  uint64_t original_record_count = record_count;
+  SBT_node *original_root = root;
   
-  if (root) {
+  SBT_transaction_guard transaction([&]() {
+    // Rollback on failure
+    next_insert_id = original_insert_id;
+    record_count = original_record_count;
+    root = original_root;
+  });
+
+  sbt_insert_id_t insert_id = next_insert_id++;
+  SBT_node *new_root = insert_node(root, data, length, insert_id);
+  
+  if (new_root) {
+    root = new_root;
     record_count++;
+    transaction.commit(); // Success - prevent rollback
     return SBT_SUCCESS;
   } else {
-    next_insert_id--; // Rollback on failure
     return SBT_ERR_OUT_OF_MEMORY;
   }
 }
@@ -87,7 +101,7 @@ int SBT_tree::remove(const uchar *data, uint length) {
   return SBT_SUCCESS;
 }
 
-/** Update record - skeleton implementation */
+/** Update record with exception safety */
 int SBT_tree::update(const uchar *old_data, uint old_length,
                      const uchar *new_data, uint new_length) {
   if (!old_data || !new_data || old_length == 0 || new_length == 0) {
@@ -100,20 +114,50 @@ int SBT_tree::update(const uchar *old_data, uint old_length,
     return SBT_ERR_INVALID_ARGUMENT; // Record not found
   }
 
-  // For now, just update the data in place if lengths match
+  // For in-place update if lengths match
   if (old_length == new_length) {
+    // Create backup of original data for rollback
+    SBT_memory_guard backup_data = sbt_make_memory_guard(old_length);
+    if (!backup_data.is_valid()) {
+      return SBT_ERR_OUT_OF_MEMORY;
+    }
+    memcpy(backup_data.get(), node->data, old_length);
+    
+    // Create transaction guard for rollback
+    SBT_transaction_guard transaction([&]() {
+      memcpy(node->data, backup_data.get(), old_length);
+    });
+    
+    // Update the data
     memcpy(node->data, new_data, new_length);
+    transaction.commit();
     return SBT_SUCCESS;
   }
 
-  // If lengths don't match, we need to remove and re-insert
-  // This is a simplified implementation for task 2.1
+  // If lengths don't match, we need atomic remove and re-insert
+  // Save tree state for rollback
+  SBT_node *original_root = root;
+  uint64_t original_record_count = record_count;
+  sbt_insert_id_t original_next_id = next_insert_id;
+  
+  SBT_transaction_guard transaction([&]() {
+    root = original_root;
+    record_count = original_record_count;
+    next_insert_id = original_next_id;
+  });
+
   int remove_result = remove(old_data, old_length);
   if (remove_result != SBT_SUCCESS) {
     return remove_result;
   }
 
-  return insert(new_data, new_length);
+  int insert_result = insert(new_data, new_length);
+  if (insert_result != SBT_SUCCESS) {
+    return insert_result;
+  }
+
+  transaction.commit();
+  return SBT_SUCCESS;
 }
 
 /** Find record by data */

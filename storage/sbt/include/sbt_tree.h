@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #define sbt_tree_h
 
 #include "sbt_common.h"
+#include "sbt_raii.h"
 #include "my_alloc.h"
 
 // SBT Node Structure
