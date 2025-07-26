@@ -62,6 +62,7 @@ run_test "Task 4.2: Shared Resource Management" "make test_task_4_2_verification
 run_test "Task 5.1: ha_sbt Class Basic Structure" "make test_task_5_1_verification && ./test_task_5_1_verification"
 run_test "Task 5.4: Record Insertion Operations" "make test_task_5_4_verification && ./test_task_5_4_verification"
 run_test "Task 5.6: Record Deletion Operations" "make test_task_5_6_verification && ./test_task_5_6_verification"
+run_test "Task 5.7: Full Table Scan Functionality" "make test_full_table_scan_standalone && ./test_full_table_scan_standalone"
 
 # Run comprehensive regression test
 run_test "Comprehensive Integration Test" "g++ -std=c++17 -Wall -Wextra -O2 -o regression_test_all regression_test_all.cc && ./regression_test_all"
