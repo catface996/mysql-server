@@ -15,7 +15,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Standalone tests
-STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone
+STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone
 STANDALONE_TARGETS = $(addprefix $(BUILD_DIR)/, $(STANDALONE_TESTS))
 
 $(BUILD_DIR)/test_insertion_standalone: $(STANDALONE_DIR)/test_insertion_standalone.cc | $(BUILD_DIR)
@@ -32,6 +32,9 @@ $(BUILD_DIR)/test_search_traversal_standalone: $(STANDALONE_DIR)/test_search_tra
 
 $(BUILD_DIR)/test_traversal_order_standalone: $(STANDALONE_DIR)/test_traversal_order_standalone.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_sbt_share_standalone: $(STANDALONE_DIR)/test_sbt_share_standalone.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
 
 # Integration tests
 INTEGRATION_TESTS = verify_unit_tests test_sbt_basic test_search_traversal_integration
@@ -119,6 +122,9 @@ test_traversal_order_standalone: $(BUILD_DIR)/test_traversal_order_standalone
 test_search_traversal_integration: $(BUILD_DIR)/test_search_traversal_integration
 	./$(BUILD_DIR)/test_search_traversal_integration
 
+test_sbt_share_standalone: $(BUILD_DIR)/test_sbt_share_standalone
+	./$(BUILD_DIR)/test_sbt_share_standalone
+
 # Clean
 clean:
 	rm -rf $(BUILD_DIR)
@@ -148,6 +154,7 @@ help:
 	@echo "  test_sbt_basic      - Build and run basic tests"
 	@echo "  test_sbt_advanced   - Build and run advanced tests"
 	@echo "  test_search_traversal_integration - Build and run search/traversal integration test"
+	@echo "  test_sbt_share_standalone - Build and run SBT share management test"
 	@echo ""
 	@echo "  clean               - Remove build artifacts"
 	@echo "  help                - Show this help message"

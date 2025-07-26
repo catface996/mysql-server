@@ -40,6 +40,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "thr_lock.h"
 #include "mysql/psi/mysql_mutex.h"
 #include "my_sys.h"
+#include "my_hash.h"
 
 /** SBT Share Class
  * 
@@ -154,12 +155,13 @@ public:
   int delete_table(const char *file_name);
 
 private:
-  /** Hash function for table names
-   * @param[in] key Table name key
-   * @param[in] length Length of key
-   * @return Hash value
+  /** Hash key function for MySQL hash table
+   * @param[in] record Hash table record (SBT_share*)
+   * @param[out] length Length of key
+   * @param[in] not_used Unused parameter
+   * @return Pointer to key data
    */
-  static ulong sbt_hash_key(const uchar *key, size_t length);
+  static uchar *sbt_hash_key(const uchar *record, size_t *length, my_bool not_used);
 
   /** Free function for hash table entries
    * @param[in] element Element to free

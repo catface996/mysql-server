@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 *****************************************************************************/
 
 /** @file sbt_share.cc
- SBT Share Management Implementation - Skeleton
+ SBT Share Management Implementation
 
  Created 2025-01-25
  *******************************************************/
@@ -35,10 +35,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "../include/sbt_common.h"
 #include "mysql/psi/mysql_mutex.h"
 #include "my_sys.h"
+#include "my_hash.h"
 
-// Static members (simplified)
+// Static members for share management
 mysql_mutex_t SBT_share::sbt_mutex;
 bool SBT_share::sbt_init_done = false;
+static HASH sbt_share_hash;  // Hash table for share management
 
 /** Constructor */
 SBT_share::SBT_share(const char *table_name_arg, uint table_name_length_arg)
@@ -86,7 +88,7 @@ SBT_share::~SBT_share() {
   mysql_mutex_destroy(&mutex);
 }
 
-/** Get share - skeleton implementation */
+/** Get share - full implementation with hash table */
 SBT_share *SBT_share::get_share(const char *table_name) {
   if (!table_name) {
     return nullptr;
@@ -94,17 +96,36 @@ SBT_share *SBT_share::get_share(const char *table_name) {
 
   mysql_mutex_lock(&sbt_mutex);
   
-  // TODO: Implement hash table lookup
-  // For now, create new share each time
+  SBT_share *share = nullptr;
   uint name_length = strlen(table_name);
-  SBT_share *share = new SBT_share(table_name, name_length);
+  
+  // Look up existing share in hash table
+  share = (SBT_share *)my_hash_search(&sbt_share_hash, 
+                                      (const uchar *)table_name, 
+                                      name_length);
+  
   if (share) {
+    // Found existing share, increment reference count
     share->increment_use_count();
-    
-    // Initialize table data
-    if (share->init_table_data(table_name) != SBT_SUCCESS) {
-      delete share;
-      share = nullptr;
+  } else {
+    // Create new share
+    share = new SBT_share(table_name, name_length);
+    if (share) {
+      // Initialize table data first
+      if (share->init_table_data(table_name) != SBT_SUCCESS) {
+        delete share;
+        share = nullptr;
+      } else {
+        // Set initial reference count
+        share->increment_use_count();
+        
+        // Add to hash table
+        if (my_hash_insert(&sbt_share_hash, (uchar *)share)) {
+          // Hash insertion failed
+          delete share;
+          share = nullptr;
+        }
+      }
     }
   }
   
@@ -112,7 +133,7 @@ SBT_share *SBT_share::get_share(const char *table_name) {
   return share;
 }
 
-/** Release share - skeleton implementation */
+/** Release share - full implementation with hash table */
 void SBT_share::release_share(SBT_share *share) {
   if (!share) {
     return;
@@ -122,9 +143,12 @@ void SBT_share::release_share(SBT_share *share) {
   
   share->decrement_use_count();
   
-  // TODO: Implement proper reference counting and hash table removal
-  // For now, just delete the share
+  // If reference count reaches zero, remove from hash and delete
   if (share->get_use_count() == 0) {
+    // Remove from hash table
+    my_hash_delete(&sbt_share_hash, (uchar *)share);
+    
+    // Delete the share object
     delete share;
   }
   
@@ -140,10 +164,15 @@ int SBT_share::init_share_system() {
   // Initialize mutex
   mysql_mutex_init(PSI_NOT_INSTRUMENTED, &sbt_mutex, MY_MUTEX_INIT_FAST);
   
-  // TODO: Initialize hash table
-  // For now, just mark as initialized
-  sbt_init_done = true;
+  // Initialize hash table
+  if (my_hash_init(&sbt_share_hash, system_charset_info, 32, 0, 0,
+                   (my_hash_get_key)sbt_hash_key, 
+                   (my_hash_free_key)sbt_hash_free, 0)) {
+    mysql_mutex_destroy(&sbt_mutex);
+    return 1;  // Failed to initialize hash table
+  }
   
+  sbt_init_done = true;
   return 0;
 }
 
@@ -155,7 +184,8 @@ void SBT_share::cleanup_share_system() {
 
   mysql_mutex_lock(&sbt_mutex);
   
-  // TODO: Cleanup hash table and all shares
+  // Cleanup hash table (this will call sbt_hash_free for each element)
+  my_hash_free(&sbt_share_hash);
   
   mysql_mutex_unlock(&sbt_mutex);
   mysql_mutex_destroy(&sbt_mutex);
@@ -198,8 +228,26 @@ int SBT_share::open_table() {
     return SBT_ERR_INVALID_ARGUMENT;
   }
 
-  // TODO: Implement proper table opening
-  // For now, just return success
+  lock_share();
+  
+  int result = SBT_SUCCESS;
+  
+  // Open the file
+  result = file->open(table_name);
+  if (result != SBT_SUCCESS) {
+    unlock_share();
+    return result;
+  }
+  
+  // Load tree data from file
+  result = file->load_tree(tree);
+  if (result != SBT_SUCCESS) {
+    file->close();
+    unlock_share();
+    return result;
+  }
+  
+  unlock_share();
   return SBT_SUCCESS;
 }
 
@@ -209,9 +257,22 @@ int SBT_share::close_table() {
     return SBT_ERR_INVALID_ARGUMENT;
   }
 
-  // TODO: Implement proper table closing with data saving
-  // For now, just return success
-  return SBT_SUCCESS;
+  lock_share();
+  
+  int result = SBT_SUCCESS;
+  
+  // Save tree data to file
+  result = file->save_tree(tree);
+  if (result != SBT_SUCCESS) {
+    unlock_share();
+    return result;
+  }
+  
+  // Close the file
+  result = file->close();
+  
+  unlock_share();
+  return result;
 }
 
 /** Create table */
@@ -232,17 +293,15 @@ int SBT_share::delete_table(const char *file_name) {
   return SBT_file::delete_file(file_name);
 }
 
-/** Hash function - skeleton implementation */
-ulong SBT_share::sbt_hash_key(const uchar *key, size_t length) {
-  // TODO: Implement proper hash function
-  ulong hash = 0;
-  for (size_t i = 0; i < length; i++) {
-    hash = hash * 31 + key[i];
-  }
-  return hash;
+/** Hash key function for MySQL hash table */
+uchar *SBT_share::sbt_hash_key(const uchar *record, size_t *length,
+                               my_bool not_used [[maybe_unused]]) {
+  SBT_share *share = (SBT_share *)record;
+  *length = share->table_name_length;
+  return (uchar *)share->table_name;
 }
 
-/** Hash free function - skeleton implementation */
+/** Hash free function for MySQL hash table */
 void SBT_share::sbt_hash_free(void *element) {
   if (element) {
     SBT_share *share = (SBT_share *)element;
