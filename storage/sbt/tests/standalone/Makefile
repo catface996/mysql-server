@@ -30,6 +30,15 @@ test_file_format: test_file_format.cc $(SBT_SOURCES)
 comprehensive_file_format_test: comprehensive_file_format_test.cc $(SBT_SOURCES)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
 
+test_file_operations_standalone: test_file_operations_standalone.cc $(SBT_SOURCES)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+
+test_file_operations_simple: test_file_operations_simple.cc
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+
+test_file_basic: test_file_basic.cc
+	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
+
 # Run all file format tests
 test-file-format: test_file_format comprehensive_file_format_test
 	@echo "=== Running Basic File Format Test ==="
@@ -38,7 +47,12 @@ test-file-format: test_file_format comprehensive_file_format_test
 	@echo "=== Running Comprehensive File Format Test ==="
 	./comprehensive_file_format_test
 
+# Run file operations tests
+test-file-operations: test_file_basic
+	@echo "=== Running File Operations Test (Basic) ==="
+	./test_file_basic
+
 clean:
-	rm -f test_file_format comprehensive_file_format_test
+	rm -f test_file_format comprehensive_file_format_test test_file_operations_standalone test_file_operations_simple test_file_basic
 
 .PHONY: clean test-file-format
