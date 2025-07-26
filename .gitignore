@@ -31,3 +31,12 @@ scalability_jobs_*
 
 # Cache directory used by e.g. clangd.
 .cache/
+
+# SBT Storage Engine test executables and debug symbols
+storage/sbt/tests/standalone/test_*
+!storage/sbt/tests/standalone/test_*.cc
+!storage/sbt/tests/standalone/test_*.sh
+storage/sbt/tests/standalone/*.dSYM/
+storage/sbt/tests/standalone/example_write_row_usage
+storage/sbt/tests/standalone/regression_test_all
+storage/sbt/tests/standalone/comprehensive_file_format_test
