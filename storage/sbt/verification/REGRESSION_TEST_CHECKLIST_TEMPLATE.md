@@ -132,6 +132,78 @@ cd storage/sbt/tests/standalone
 **实际结果**: [ ] 通过 / [ ] 失败
 **备注**: _______________
 
+#### Task 4.1: SBT_share类实现 (如果已实现)
+**执行命令**: `make test_sbt_share_standalone && ./test_sbt_share_standalone`
+
+验证点:
+- [ ] 共享信息数据结构
+- [ ] 引用计数机制
+- [ ] 线程安全锁机制
+- [ ] 资源管理
+- [ ] 错误处理
+
+**通过标准**: 显示"🎉 ALL SBT_SHARE TESTS PASSED! 🎉"
+**实际结果**: [ ] 通过 / [ ] 失败
+**备注**: _______________
+
+#### Task 4.2: 共享资源管理 (如果已实现)
+**执行命令**: `make test_task_4_2_verification && ./test_task_4_2_verification`
+
+验证点:
+- [ ] get_share和release_share方法
+- [ ] 哈希表管理
+- [ ] 并发访问同步
+- [ ] 引用计数正确性
+- [ ] 多线程安全性
+
+**通过标准**: 显示"🎉 TASK 4.2 IMPLEMENTATION VERIFIED! 🎉"
+**实际结果**: [ ] 通过 / [ ] 失败
+**备注**: _______________
+
+#### Task 5.1: ha_sbt类基础结构 (如果已实现)
+**执行命令**: `make test_task_5_1_verification && ./test_task_5_1_verification`
+
+验证点:
+- [ ] ha_sbt类构造和析构函数
+- [ ] table_type和table_flags方法
+- [ ] 存储引擎基本属性
+- [ ] MySQL插件注册
+- [ ] handlerton集成
+
+**通过标准**: 显示"🎉 TASK 5.1 VERIFICATION COMPLETE! 🎉"
+**实际结果**: [ ] 通过 / [ ] 失败
+**备注**: _______________
+
+#### Task 5.4: 记录插入操作 (如果已实现)
+**执行命令**: `make test_task_5_4_verification && ./test_task_5_4_verification`
+
+验证点:
+- [ ] write_row方法实现
+- [ ] MySQL记录格式转换
+- [ ] 插入后数据持久化
+- [ ] 错误处理机制
+- [ ] 性能特征
+
+**通过标准**: 显示"🎉 TASK 5.4 VERIFICATION PASSED! 🎉"
+**实际结果**: [ ] 通过 / [ ] 失败
+**备注**: _______________
+
+#### Task 5.6: 记录删除操作 (如果已实现)
+**执行命令**: `make test_task_5_6_verification && ./test_task_5_6_verification`
+
+验证点:
+- [ ] delete_row方法实现
+- [ ] 数据内容比较定位记录
+- [ ] 删除后数据持久化
+- [ ] 删除操作边界情况处理
+- [ ] 删除不存在记录的处理
+- [ ] 删除和扫描一致性
+- [ ] 性能特征
+
+**通过标准**: 显示"🎉 TASK 5.6 VERIFICATION PASSED! 🎉"
+**实际结果**: [ ] 通过 / [ ] 失败
+**备注**: _______________
+
 ### 综合集成测试
 **执行命令**: `g++ -std=c++17 -Wall -Wextra -O2 -o regression_test_all regression_test_all.cc && ./regression_test_all`
 
