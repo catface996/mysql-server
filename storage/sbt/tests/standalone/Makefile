@@ -64,6 +64,9 @@ test_task_5_7_verification: test_task_5_7_verification.cc
 test_full_table_scan_standalone: test_full_table_scan_standalone.cc
 	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
 
+test_task_6_1_verification: test_task_6_1_verification.cc
+	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
+
 # Run all file format tests
 test-file-format: test_file_format comprehensive_file_format_test
 	@echo "=== Running Basic File Format Test ==="
@@ -86,6 +89,6 @@ test-share-management: test_sbt_share_standalone test_task_4_2_verification
 	./test_task_4_2_verification
 
 clean:
-	rm -f test_file_format comprehensive_file_format_test test_file_operations_standalone test_file_operations_simple test_file_basic test_sbt_share_standalone test_share_resource_management test_task_4_2_verification test_task_5_1_verification test_task_5_4_verification test_task_5_6_verification test_task_5_7_verification test_full_table_scan_standalone
+	rm -f test_file_format comprehensive_file_format_test test_file_operations_standalone test_file_operations_simple test_file_basic test_sbt_share_standalone test_share_resource_management test_task_4_2_verification test_task_5_1_verification test_task_5_4_verification test_task_5_6_verification test_task_5_7_verification test_full_table_scan_standalone test_task_6_1_verification
 
 .PHONY: clean test-file-format test-file-operations test-share-management
