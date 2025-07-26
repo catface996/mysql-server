@@ -13,7 +13,7 @@
   - 创建内存管理相关的辅助函数
   - 编写基础数据结构的单元测试，验证节点创建和内存管理的正确性
   - 创建独立测试验证SBT_tree的构造、析构和基本属性
-  - **验证报告**: [TASK_2_1_VERIFICATION.md](../../storage/sbt/verification/TASK_2_1_VERIFICATION.md)
+  - **验证报告**: [TASK_2_1_VERIFICATION.md](../../../storage/sbt/verification/TASK_2_1_VERIFICATION.md)
   - _需求: 2.2, 6.1_
 
 - [x] 2.2 实现SBT树的插入操作
@@ -22,7 +22,7 @@
   - 实现左旋和右旋操作
   - 编写插入操作的单元测试，验证插入后树的正确性和平衡性
   - 创建独立的测试程序验证插入功能
-  - **验证报告**: [TASK_2_2_VERIFICATION.md](../../storage/sbt/verification/TASK_2_2_VERIFICATION.md)
+  - **验证报告**: [TASK_2_2_VERIFICATION.md](../../../storage/sbt/verification/TASK_2_2_VERIFICATION.md)
   - _需求: 2.1, 2.2, 2.3_
 
 - [x] 2.3 实现SBT树的删除操作
@@ -31,7 +31,7 @@
   - 处理删除操作的边界情况
   - 编写删除操作的单元测试，验证删除后树的正确性
   - 创建独立测试验证删除功能，包括删除不存在记录的情况
-  - **验证报告**: [TASK_2_3_VERIFICATION.md](../../storage/sbt/verification/TASK_2_3_VERIFICATION.md)
+  - **验证报告**: [TASK_2_3_VERIFICATION.md](../../../storage/sbt/verification/TASK_2_3_VERIFICATION.md)
   - _需求: 5.1, 5.2, 5.3_
 
 - [x] 2.4 实现SBT树的查找和遍历操作
@@ -40,7 +40,7 @@
   - 实现get_first和get_next方法
   - 编写查找和遍历的单元测试，验证遍历顺序的正确性
   - 创建独立测试验证查找功能和遍历的完整性
-  - **验证报告**: [TASK_2_4_VERIFICATION.md](../../storage/sbt/verification/TASK_2_4_VERIFICATION.md)
+  - **验证报告**: [TASK_2_4_VERIFICATION.md](../../../storage/sbt/verification/TASK_2_4_VERIFICATION.md)
   - _需求: 3.1, 3.2, 3.3_
 
 - [x] 3. 实现文件持久化系统
@@ -48,7 +48,7 @@
   - 定义文件头结构和魔数
   - 实现文件头的读写操作
   - 设计SBT树的序列化格式
-  - **验证报告**: [TASK_3_1_VERIFICATION.md](../../storage/sbt/verification/TASK_3_1_VERIFICATION.md)
+  - **验证报告**: [TASK_3_1_VERIFICATION.md](../../../storage/sbt/verification/TASK_3_1_VERIFICATION.md)
   - _需求: 6.2, 6.3_
 
 - [x] 3.2 实现树的序列化和反序列化
@@ -116,7 +116,7 @@
   - 处理插入操作的错误情况
   - 创建独立测试验证记录插入和格式转换的正确性
   - 测试内存不足等异常情况的处理
-  - **验证报告**: [TASK_5_4_VERIFICATION.md](../../storage/sbt/verification/TASK_5_4_VERIFICATION.md)
+  - **验证报告**: [TASK_5_4_VERIFICATION.md](../../../storage/sbt/verification/TASK_5_4_VERIFICATION.md)
   - _需求: 2.1, 2.2, 2.3, 2.4_
 
 - [x] 5.5 实现记录的更新操作
@@ -151,7 +151,7 @@
   - 定义SBT存储引擎的handlerton
   - 实现存储引擎的初始化和清理函数
   - 设置存储引擎的标志和属性
-  - **验证报告**: [TASK_6_1_VERIFICATION.md](../../storage/sbt/verification/TASK_6_1_VERIFICATION.md)
+  - **验证报告**: [TASK_6_1_VERIFICATION.md](../../../storage/sbt/verification/TASK_6_1_VERIFICATION.md)
   - _需求: 8.1, 8.2_
 
 - [x] 6.2 实现存储引擎插件接口
@@ -160,7 +160,7 @@
   - 添加版本信息和描述
   - 创建独立测试验证插件的加载和卸载
   - 测试存储引擎在MySQL中的注册状态
-  - **验证报告**: [TASK_6_2_VERIFICATION.md](../../storage/sbt/verification/TASK_6_2_VERIFICATION.md)
+  - **验证报告**: [TASK_6_2_VERIFICATION.md](../../../storage/sbt/verification/TASK_6_2_VERIFICATION.md)
   - _需求: 8.1, 8.2, 8.3_
 
 - [x] 7. 实现错误处理和日志系统
@@ -191,7 +191,7 @@
   - 编写SBT算法的单元测试
   - 测试插入、删除、查找操作的正确性
   - 验证树平衡性质的维护
-  - **验证报告**: [TASK_8_1_VERIFICATION.md](../../storage/sbt/verification/TASK_8_1_VERIFICATION.md)
+  - **验证报告**: [TASK_8_1_VERIFICATION.md](../../../storage/sbt/verification/TASK_8_1_VERIFICATION.md)
   - _需求: 2.1, 2.2, 3.1, 4.1, 5.1_
 
 - [ ] 8.2 创建MySQL集成测试
@@ -201,7 +201,7 @@
   - 测试存储引擎的基本信息查询（版本、支持特性等）
   - 验证handlerton结构的正确注册和初始化
   - 创建集成测试脚本验证插件在MySQL中的激活状态
-  - **验证报告**: [REGRESSION_TEST_REPORT_TASK_8_2_1.md](../../storage/sbt/verification/REGRESSION_TEST_REPORT_TASK_8_2_1.md)
+  - **验证报告**: [REGRESSION_TEST_REPORT_TASK_8_2_1.md](../../../storage/sbt/verification/REGRESSION_TEST_REPORT_TASK_8_2_1.md)
   - _需求: 6.1, 8.1, 8.2_
 
 - [x] 8.2.2 验证表的创建和删除操作
@@ -212,7 +212,7 @@
   - 测试重复创建和删除表的错误处理
   - 验证表元数据在MySQL系统表中的正确记录
   - 创建集成测试脚本验证表生命周期管理
-  - **验证报告**: [TASK_8_2_2_VERIFICATION.md](../../storage/sbt/verification/TASK_8_2_2_VERIFICATION.md)
+  - **验证报告**: [TASK_8_2_2_VERIFICATION.md](../../../storage/sbt/verification/TASK_8_2_2_VERIFICATION.md)
   - _需求: 1.1, 1.3, 5.2, 7.1, 7.2_
 
 - [x] 8.2.3 验证记录的插入操作
@@ -223,7 +223,7 @@
   - 验证插入操作的错误处理（重复键、数据类型错误等）
   - 测试大量数据插入的性能和稳定性
   - 创建集成测试脚本验证插入功能的完整性
-  - **验证报告**: [task_8_2_3_verification_report.md](../../storage/sbt/verification/task_8_2_3_verification_report.md)
+  - **验证报告**: [task_8_2_3_verification_report.md](../../../storage/sbt/verification/task_8_2_3_verification_report.md)
   - _需求: 2.1, 2.2, 2.3, 5.4_
 
 - [ ] 8.2.4 验证记录的查询操作
