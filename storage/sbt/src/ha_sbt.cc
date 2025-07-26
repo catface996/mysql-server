@@ -351,27 +351,61 @@ int ha_sbt::create(const char *name, TABLE *table_arg,
                    HA_CREATE_INFO *create_info, dd::Table *table_def) {
   DBUG_ENTER("ha_sbt::create");
   
+  // Validate input parameters
+  if (!name || !table_arg) {
+    sbt_log_error("Invalid parameters for table creation");
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+  }
+  
   char file_path[FN_REFLEN];
   get_table_file_path(name, file_path, sizeof(file_path));
+  
+  // Check if file already exists
+  if (SBT_file::file_exists(file_path)) {
+    sbt_log_error("Table file already exists: %s", file_path);
+    DBUG_RETURN(HA_ERR_FOUND_DUPP_KEY);  // Use existing MySQL error code
+  }
   
   // Create the table file
   SBT_file file;
   int error = file.create(file_path);
+  if (error != SBT_SUCCESS) {
+    sbt_log_error("Failed to create table file: %s, error: %d", file_path, error);
+    DBUG_RETURN(sbt_error_to_mysql_error(error));
+  }
   
-  DBUG_RETURN(sbt_error_to_mysql_error(error));
+  sbt_log_info("Successfully created table file: %s", file_path);
+  DBUG_RETURN(0);
 }
 
 /** Delete table */
 int ha_sbt::delete_table(const char *name, const dd::Table *table_def) {
   DBUG_ENTER("ha_sbt::delete_table");
   
+  // Validate input parameters
+  if (!name) {
+    sbt_log_error("Invalid table name for deletion");
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+  }
+  
   char file_path[FN_REFLEN];
   get_table_file_path(name, file_path, sizeof(file_path));
   
+  // Check if file exists before attempting deletion
+  if (!SBT_file::file_exists(file_path)) {
+    sbt_log_error("Table file does not exist: %s", file_path);
+    DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
+  }
+  
   // Delete the table file
   int error = SBT_file::delete_file(file_path);
+  if (error != SBT_SUCCESS) {
+    sbt_log_error("Failed to delete table file: %s, error: %d", file_path, error);
+    DBUG_RETURN(sbt_error_to_mysql_error(error));
+  }
   
-  DBUG_RETURN(sbt_error_to_mysql_error(error));
+  sbt_log_info("Successfully deleted table file: %s", file_path);
+  DBUG_RETURN(0);
 }
 
 /** External lock */
