@@ -15,7 +15,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Standalone tests
-STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone test_task_4_2_verification test_ha_sbt_structure test_task_5_1_verification test_task_5_4_verification test_table_create_delete test_table_open_close test_update_standalone test_ha_sbt_update
+STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone test_task_4_2_verification test_ha_sbt_structure test_task_5_1_verification test_task_5_4_verification test_table_create_delete test_table_open_close test_update_standalone test_ha_sbt_update test_error_handling_standalone
 STANDALONE_TARGETS = $(addprefix $(BUILD_DIR)/, $(STANDALONE_TESTS))
 
 $(BUILD_DIR)/test_insertion_standalone: $(STANDALONE_DIR)/test_insertion_standalone.cc | $(BUILD_DIR)
@@ -58,6 +58,9 @@ $(BUILD_DIR)/test_update_standalone: $(STANDALONE_DIR)/test_update_standalone.cc
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 $(BUILD_DIR)/test_ha_sbt_update: $(STANDALONE_DIR)/test_ha_sbt_update.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_error_handling_standalone: $(STANDALONE_DIR)/test_error_handling_standalone.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 # Integration tests
@@ -190,6 +193,9 @@ test_table_create_delete: $(BUILD_DIR)/test_table_create_delete
 
 test_table_open_close: $(BUILD_DIR)/test_table_open_close
 	./$(BUILD_DIR)/test_table_open_close
+
+test_error_handling_standalone: $(BUILD_DIR)/test_error_handling_standalone
+	./$(BUILD_DIR)/test_error_handling_standalone
 
 # Clean
 clean:

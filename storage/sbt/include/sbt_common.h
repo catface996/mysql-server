@@ -53,13 +53,66 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 // SBT Error Codes
 enum sbt_error_t {
   SBT_SUCCESS = 0,
+  
+  // Memory related errors
   SBT_ERR_OUT_OF_MEMORY,
+  SBT_ERR_MEMORY_CORRUPTION,
+  
+  // File system errors
   SBT_ERR_FILE_NOT_FOUND,
-  SBT_ERR_CORRUPTED_DATA,
-  SBT_ERR_DUPLICATE_KEY,
+  SBT_ERR_FILE_EXISTS,
+  SBT_ERR_FILE_PERMISSION,
+  SBT_ERR_FILE_CORRUPTED,
   SBT_ERR_IO_ERROR,
+  SBT_ERR_DISK_FULL,
+  
+  // Data integrity errors
+  SBT_ERR_CORRUPTED_DATA,
+  SBT_ERR_INVALID_HEADER,
+  SBT_ERR_CHECKSUM_MISMATCH,
+  SBT_ERR_VERSION_MISMATCH,
+  
+  // Tree operation errors
+  SBT_ERR_DUPLICATE_KEY,
+  SBT_ERR_KEY_NOT_FOUND,
+  SBT_ERR_TREE_CORRUPTED,
+  SBT_ERR_NODE_INVALID,
+  
+  // Parameter and state errors
   SBT_ERR_INVALID_ARGUMENT,
-  SBT_ERR_GENERIC
+  SBT_ERR_NULL_POINTER,
+  SBT_ERR_BUFFER_TOO_SMALL,
+  SBT_ERR_INVALID_STATE,
+  
+  // Resource errors
+  SBT_ERR_RESOURCE_BUSY,
+  SBT_ERR_RESOURCE_EXHAUSTED,
+  SBT_ERR_TIMEOUT,
+  
+  // Generic and unknown errors
+  SBT_ERR_NOT_IMPLEMENTED,
+  SBT_ERR_GENERIC,
+  SBT_ERR_UNKNOWN
+};
+
+// Error severity levels
+enum sbt_error_severity_t {
+  SBT_SEVERITY_INFO = 0,
+  SBT_SEVERITY_WARNING,
+  SBT_SEVERITY_ERROR,
+  SBT_SEVERITY_FATAL
+};
+
+// Error context structure for detailed error reporting
+struct SBT_error_context {
+  sbt_error_t error_code;
+  sbt_error_severity_t severity;
+  const char *file;
+  int line;
+  const char *function;
+  char message[512];
+  uint64_t timestamp;
+  uint32_t thread_id;
 };
 
 // Forward declarations
@@ -106,10 +159,58 @@ struct SBT_serialized_node {
 #define SBT_MAX_RECORD_SIZE (64 * 1024)  // 64KB max record size
 #define SBT_FILE_ALIGNMENT 8             // File data alignment
 
-// Utility functions
-int sbt_error_to_mysql_error(int sbt_error);
+// Error handling functions
+int sbt_error_to_mysql_error(sbt_error_t sbt_error);
+const char *sbt_error_to_string(sbt_error_t error_code);
+const char *sbt_severity_to_string(sbt_error_severity_t severity);
+
+// Enhanced logging functions
 void sbt_log_error(const char *format, ...);
+void sbt_log_warning(const char *format, ...);
 void sbt_log_info(const char *format, ...);
+void sbt_log_debug(const char *format, ...);
+
+// Error context functions
+void sbt_error_context_init(SBT_error_context *ctx);
+void sbt_error_context_set(SBT_error_context *ctx, sbt_error_t error_code,
+                          sbt_error_severity_t severity, const char *file,
+                          int line, const char *function, const char *format, ...);
+void sbt_error_context_log(const SBT_error_context *ctx);
+void sbt_error_context_clear(SBT_error_context *ctx);
+
+// Error handling macros for convenience
+#define SBT_SET_ERROR(ctx, code, severity, fmt, ...) \
+  sbt_error_context_set(ctx, code, severity, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+
+#define SBT_LOG_ERROR(fmt, ...) \
+  sbt_log_error("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
+#define SBT_LOG_WARNING(fmt, ...) \
+  sbt_log_warning("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
+#define SBT_LOG_INFO(fmt, ...) \
+  sbt_log_info("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
+#define SBT_LOG_DEBUG(fmt, ...) \
+  sbt_log_debug("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+
+// Error checking macros
+#define SBT_RETURN_IF_ERROR(expr) \
+  do { \
+    sbt_error_t _err = (expr); \
+    if (_err != SBT_SUCCESS) { \
+      SBT_LOG_ERROR("Operation failed with error: %s", sbt_error_to_string(_err)); \
+      return _err; \
+    } \
+  } while (0)
+
+#define SBT_RETURN_IF_NULL(ptr, error_code) \
+  do { \
+    if ((ptr) == nullptr) { \
+      SBT_LOG_ERROR("Null pointer detected"); \
+      return error_code; \
+    } \
+  } while (0)
 
 // Memory management helpers
 void *sbt_malloc(size_t size);
