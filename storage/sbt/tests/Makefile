@@ -15,7 +15,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Standalone tests
-STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone test_ha_sbt_structure test_task_5_1_verification test_table_create_delete test_table_open_close
+STANDALONE_TESTS = test_insertion_standalone test_deletion_standalone test_deletion_advanced test_search_traversal_standalone test_traversal_order_standalone test_sbt_share_standalone test_task_4_2_verification test_ha_sbt_structure test_task_5_1_verification test_task_5_4_verification test_table_create_delete test_table_open_close test_update_standalone test_ha_sbt_update
 STANDALONE_TARGETS = $(addprefix $(BUILD_DIR)/, $(STANDALONE_TESTS))
 
 $(BUILD_DIR)/test_insertion_standalone: $(STANDALONE_DIR)/test_insertion_standalone.cc | $(BUILD_DIR)
@@ -36,16 +36,28 @@ $(BUILD_DIR)/test_traversal_order_standalone: $(STANDALONE_DIR)/test_traversal_o
 $(BUILD_DIR)/test_sbt_share_standalone: $(STANDALONE_DIR)/test_sbt_share_standalone.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
 
+$(BUILD_DIR)/test_task_4_2_verification: $(STANDALONE_DIR)/test_task_4_2_verification.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
+
 $(BUILD_DIR)/test_ha_sbt_structure: $(STANDALONE_DIR)/test_ha_sbt_structure.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 $(BUILD_DIR)/test_task_5_1_verification: $(STANDALONE_DIR)/test_task_5_1_verification.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
+$(BUILD_DIR)/test_task_5_4_verification: $(STANDALONE_DIR)/test_task_5_4_verification.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
 $(BUILD_DIR)/test_table_create_delete: $(STANDALONE_DIR)/test_table_create_delete.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 $(BUILD_DIR)/test_table_open_close: $(STANDALONE_DIR)/test_table_open_close.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_update_standalone: $(STANDALONE_DIR)/test_update_standalone.cc | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+$(BUILD_DIR)/test_ha_sbt_update: $(STANDALONE_DIR)/test_ha_sbt_update.cc | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 # Integration tests
@@ -146,6 +158,15 @@ test_search_traversal_integration: $(BUILD_DIR)/test_search_traversal_integratio
 test_sbt_share_standalone: $(BUILD_DIR)/test_sbt_share_standalone
 	./$(BUILD_DIR)/test_sbt_share_standalone
 
+test_task_4_2_verification: $(BUILD_DIR)/test_task_4_2_verification
+	./$(BUILD_DIR)/test_task_4_2_verification
+
+test_update_standalone: $(BUILD_DIR)/test_update_standalone
+	./$(BUILD_DIR)/test_update_standalone
+
+test_ha_sbt_update: $(BUILD_DIR)/test_ha_sbt_update
+	./$(BUILD_DIR)/test_ha_sbt_update
+
 test_ha_sbt_basic: $(BUILD_DIR)/test_ha_sbt_basic
 	./$(BUILD_DIR)/test_ha_sbt_basic
 
@@ -160,6 +181,9 @@ test_ha_sbt_structure: $(BUILD_DIR)/test_ha_sbt_structure
 
 test_task_5_1_verification: $(BUILD_DIR)/test_task_5_1_verification
 	./$(BUILD_DIR)/test_task_5_1_verification
+
+test_task_5_4_verification: $(BUILD_DIR)/test_task_5_4_verification
+	./$(BUILD_DIR)/test_task_5_4_verification
 
 test_table_create_delete: $(BUILD_DIR)/test_table_create_delete
 	./$(BUILD_DIR)/test_table_create_delete

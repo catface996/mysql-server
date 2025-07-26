@@ -46,7 +46,7 @@ private:
     std::vector<void*> allocated_blocks;
     
 public:
-    MEM_ROOT(void* psi, size_t block_size) {}
+    MEM_ROOT(void* /*psi*/, size_t /*block_size*/) {}
     
     void* Alloc(size_t size) {
         void* ptr = malloc(size);

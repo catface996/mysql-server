@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include <string>
 #include <cstdint>
 #include <cstdlib>
+#include <algorithm>
 
 // Minimal types for testing
 typedef unsigned char uchar;
@@ -166,30 +167,58 @@ public:
       SBT_node* to_delete = *node;
       
       if ((*node)->left == nullptr && (*node)->right == nullptr) {
+        // Leaf node
         *node = nullptr;
       } else if ((*node)->left == nullptr) {
+        // Only right child
         *node = (*node)->right;
       } else if ((*node)->right == nullptr) {
+        // Only left child
         *node = (*node)->left;
       } else {
-        // Find minimum in right subtree
-        SBT_node* min_right = (*node)->right;
-        while (min_right->left) {
-          min_right = min_right->left;
+        // Two children - find minimum in right subtree
+        SBT_node* min_parent = *node;
+        SBT_node* min_node = (*node)->right;
+        
+        // Find the leftmost node in right subtree
+        while (min_node->left) {
+          min_parent = min_node;
+          min_node = min_node->left;
         }
         
-        // Copy data from min_right to current node
+        // Copy data from min_node to current node
         free((*node)->data);
-        (*node)->data = (uchar*)malloc(min_right->data_length);
-        memcpy((*node)->data, min_right->data, min_right->data_length);
-        (*node)->data_length = min_right->data_length;
-        (*node)->insert_id = min_right->insert_id;
+        (*node)->data = (uchar*)malloc(min_node->data_length);
+        memcpy((*node)->data, min_node->data, min_node->data_length);
+        (*node)->data_length = min_node->data_length;
+        (*node)->insert_id = min_node->insert_id;
         
-        // Remove min_right
-        remove_recursive(&((*node)->right), (char*)min_right->data, min_right->data_length);
+        // Remove min_node from its position
+        if (min_parent == *node) {
+          // min_node is the direct right child
+          min_parent->right = min_node->right;
+        } else {
+          // min_node is deeper in the tree
+          min_parent->left = min_node->right;
+        }
+        
+        // Remove from allocated_nodes and free the min_node
+        auto it = std::find(allocated_nodes.begin(), allocated_nodes.end(), min_node);
+        if (it != allocated_nodes.end()) {
+          allocated_nodes.erase(it);
+        }
+        free(min_node->data);
+        free(min_node);
         return SBT_SUCCESS;
       }
       
+      // Remove from allocated_nodes and free the original node (for leaf and single-child cases)
+      auto it = std::find(allocated_nodes.begin(), allocated_nodes.end(), to_delete);
+      if (it != allocated_nodes.end()) {
+        allocated_nodes.erase(it);
+      }
+      free(to_delete->data);
+      free(to_delete);
       return SBT_SUCCESS;
     }
     

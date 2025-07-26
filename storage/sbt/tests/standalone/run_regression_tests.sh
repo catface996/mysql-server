@@ -54,6 +54,14 @@ if [ -f "verify_serialization.sh" ]; then
     run_test "Task 3.2: Serialization" "./verify_serialization.sh"
 fi
 
+# Run shared resource management tests
+run_test "Task 4.1: SBT_share Class Implementation" "make test_sbt_share_standalone && ./test_sbt_share_standalone"
+run_test "Task 4.2: Shared Resource Management" "make test_task_4_2_verification && ./test_task_4_2_verification"
+
+# Run MySQL Handler interface tests
+run_test "Task 5.1: ha_sbt Class Basic Structure" "make test_task_5_1_verification && ./test_task_5_1_verification"
+run_test "Task 5.4: Record Insertion Operations" "make test_task_5_4_verification && ./test_task_5_4_verification"
+
 # Run comprehensive regression test
 run_test "Comprehensive Integration Test" "g++ -std=c++17 -Wall -Wextra -O2 -o regression_test_all regression_test_all.cc && ./regression_test_all"
 
