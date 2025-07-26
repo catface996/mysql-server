@@ -49,6 +49,12 @@ test_share_resource_management: test_share_resource_management.cc $(SBT_SOURCES)
 test_task_4_2_verification: test_task_4_2_verification.cc
 	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
 
+test_task_6_2_verification: test_task_6_2_verification.cc
+	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
+
+test_plugin_interface_complete: test_plugin_interface_complete.cc
+	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
+
 test_task_5_1_verification: test_task_5_1_verification.cc
 	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
 

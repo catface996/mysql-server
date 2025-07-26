@@ -44,6 +44,25 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 // Global handlerton for SBT storage engine
 handlerton *sbt_hton = nullptr;
 
+// Status variables for SBT storage engine
+static long sbt_tables_created = 0;
+static long sbt_tables_opened = 0;
+static long sbt_rows_inserted = 0;
+static long sbt_rows_updated = 0;
+static long sbt_rows_deleted = 0;
+static long sbt_rows_read = 0;
+
+// Status variable definitions
+static SHOW_VAR sbt_status_variables[] = {
+  {"sbt_tables_created", (char*)&sbt_tables_created, SHOW_LONG},
+  {"sbt_tables_opened", (char*)&sbt_tables_opened, SHOW_LONG},
+  {"sbt_rows_inserted", (char*)&sbt_rows_inserted, SHOW_LONG},
+  {"sbt_rows_updated", (char*)&sbt_rows_updated, SHOW_LONG},
+  {"sbt_rows_deleted", (char*)&sbt_rows_deleted, SHOW_LONG},
+  {"sbt_rows_read", (char*)&sbt_rows_read, SHOW_LONG},
+  {0, 0, SHOW_UNDEF}
+};
+
 // Storage engine plugin declaration
 static struct st_mysql_storage_engine sbt_storage_engine = {
   MYSQL_HANDLERTON_INTERFACE_VERSION
@@ -106,14 +125,14 @@ mysql_declare_plugin(sbt) {
   "Oracle Corporation",
   "Size Balanced Tree Storage Engine",
   PLUGIN_LICENSE_GPL,
-  sbt_init_func,    // Plugin init function
-  nullptr,          // Plugin check uninstall function  
-  sbt_done_func,    // Plugin deinit function
-  0x0100,           // Version 1.0
-  nullptr,          // Status variables
-  nullptr,          // System variables
-  nullptr,          // Config options
-  0,                // Flags
+  sbt_init_func,         // Plugin init function
+  nullptr,               // Plugin check uninstall function  
+  sbt_done_func,         // Plugin deinit function
+  0x0100,                // Version 1.0
+  sbt_status_variables,  // Status variables
+  nullptr,               // System variables
+  nullptr,               // Config options
+  0,                     // Flags
 }
 mysql_declare_plugin_end;
 
@@ -180,6 +199,10 @@ int ha_sbt::open(const char *name, int mode, uint test_if_locked,
   scan_initialized = false;
   
   sbt_log_info("Successfully opened table: %s", name);
+  
+  // Update status variable
+  sbt_tables_opened++;
+  
   DBUG_RETURN(0);
 }
 
@@ -254,6 +277,8 @@ int ha_sbt::write_row(uchar *buf) {
   if (error == SBT_SUCCESS) {
     sbt_log_debug("Successfully inserted record into SBT tree, total records: %llu", 
                   share->get_tree()->get_record_count());
+    // Update status variable
+    sbt_rows_inserted++;
   } else {
     sbt_log_error("Failed to insert record into SBT tree, error: %d", error);
   }
@@ -288,6 +313,11 @@ int ha_sbt::update_row(const uchar *old_data, uchar *new_data) {
   error = share->get_tree()->update(old_packed, old_length, 
                                    new_packed, new_length);
   
+  // Update status variable if successful
+  if (error == SBT_SUCCESS) {
+    sbt_rows_updated++;
+  }
+  
   // Free packed data
   if (old_packed) sbt_free(old_packed);
   if (new_packed) sbt_free(new_packed);
@@ -313,6 +343,11 @@ int ha_sbt::delete_row(const uchar *buf) {
 
   // Remove from tree
   error = share->get_tree()->remove(packed_data, packed_length);
+  
+  // Update status variable if successful
+  if (error == SBT_SUCCESS) {
+    sbt_rows_deleted++;
+  }
   
   // Free packed data
   if (packed_data) {
@@ -355,6 +390,9 @@ int ha_sbt::rnd_next(uchar *buf) {
   if (error) {
     DBUG_RETURN(error);
   }
+
+  // Update status variable for successful read
+  sbt_rows_read++;
 
   // Move to next record
   current_node = share->get_tree()->get_next(current_node);
@@ -429,6 +467,10 @@ int ha_sbt::create(const char *name, TABLE *table_arg,
   }
   
   sbt_log_info("Successfully created table file: %s", file_path);
+  
+  // Update status variable
+  sbt_tables_created++;
+  
   DBUG_RETURN(0);
 }
 

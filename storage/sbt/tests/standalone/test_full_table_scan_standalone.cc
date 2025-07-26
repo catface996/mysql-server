@@ -395,11 +395,8 @@ bool test_traversal_order_consistency() {
     print_pass("Traversal order is consistent across multiple traversals");
     
     // Verify traversal is in insert_id order (chronological)
-    bool is_ordered = true;
-    for (size_t i = 1; i < first_traversal.size(); i++) {
-        // Since we can't access insert_id directly, we'll just verify
-        // that the same order is maintained
-    }
+    // Since we can't access insert_id directly, we'll just verify
+    // that the same order is maintained across multiple traversals
     print_pass("Traversal maintains consistent ordering");
     
     return true;
