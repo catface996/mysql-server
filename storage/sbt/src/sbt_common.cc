@@ -247,15 +247,8 @@ void sbt_log_debug(const char *format, ...) {
   char buffer[1024];
   vsnprintf(buffer, sizeof(buffer), format, args);
   
-  #ifdef MYSQL_SERVER
-    #ifdef UNIV_DEBUG
-      LogErr(INFORMATION_LEVEL, ER_IB_MSG_GENERIC, "SBT-DEBUG", buffer);
-    #endif
-  #else
-    #ifdef DEBUG
-      printf("[DEBUG] SBT: %s\n", buffer);
-    #endif
-  #endif
+  // Use MySQL's sql_print_information for debug messages
+  sql_print_information("[DEBUG] SBT: %s", buffer);
   
   va_end(args);
 }

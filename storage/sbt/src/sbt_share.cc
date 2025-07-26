@@ -36,6 +36,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "mysql/psi/mysql_mutex.h"
 #include "my_sys.h"
 #include "my_sys.h"
+#include "my_io.h"
+#include <unistd.h>
 
 // Static members for share management
 mysql_mutex_t SBT_share::sbt_mutex;
@@ -119,6 +121,7 @@ SBT_share *SBT_share::get_share(const char *table_name) {
     if (share) {
       // Initialize table data first
       if (share->init_table_data(table_name) != SBT_SUCCESS) {
+        sbt_log_error("Failed to initialize table data for: %s", table_name);
         delete share;
         share = nullptr;
       } else {
@@ -129,6 +132,8 @@ SBT_share *SBT_share::get_share(const char *table_name) {
         share->next = sbt_share_list;
         sbt_share_list = share;
       }
+    } else {
+      sbt_log_error("Failed to create new SBT_share for table: %s", table_name);
     }
   }
   
@@ -243,9 +248,14 @@ int SBT_share::open_table() {
   
   int result = SBT_SUCCESS;
   
+  // Create file path with .sbt extension
+  char file_path[FN_REFLEN];
+  snprintf(file_path, sizeof(file_path), "%s.sbt", table_name);
+  
   // Open the file
-  result = file->open(table_name);
+  result = file->open(file_path);
   if (result != SBT_SUCCESS) {
+    sbt_log_error("Failed to open SBT file: %s, error: %d", file_path, result);
     unlock_share();
     return result;
   }
@@ -253,6 +263,7 @@ int SBT_share::open_table() {
   // Load tree data from file
   result = file->load_tree(tree);
   if (result != SBT_SUCCESS) {
+    sbt_log_error("Failed to load tree data from file: %s, error: %d", file_path, result);
     file->close();
     unlock_share();
     return result;

@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "sql/sql_class.h"
 #include "sql/sql_plugin.h"
 #include "sql/table.h"
+#include "sql/log.h"
 #include "thr_lock.h"
 
 #include "../include/ha_sbt.h"
@@ -142,6 +143,7 @@ ha_sbt::ha_sbt(handlerton *hton, TABLE_SHARE *table_arg)
       share(nullptr),
       current_node(nullptr),
       scan_initialized(false) {
+  sbt_log_debug("=== HA_SBT CONSTRUCTOR CALLED ===");
   // Lock data will be initialized in open() when share is available
 }
 
@@ -155,6 +157,7 @@ ulonglong ha_sbt::table_flags() const {
   return (HA_FAST_KEY_READ |            // Fast key read (not used)
           HA_NULL_IN_KEY |              // NULL values in keys (not used)
           HA_CAN_SQL_HANDLER |          // Can use HANDLER statements
+          HA_BINLOG_ROW_CAPABLE |       // Row-based replication support
           HA_BINLOG_STMT_CAPABLE);      // Statement-based replication
 }
 
@@ -162,6 +165,8 @@ ulonglong ha_sbt::table_flags() const {
 int ha_sbt::open(const char *name, int mode, uint test_if_locked,
                  const dd::Table *table_def) {
   DBUG_ENTER("ha_sbt::open");
+  
+  sbt_log_debug("=== OPEN CALLED for table: %s, mode: %d ===", name ? name : "NULL", mode);
   
   // Validate input parameters
   if (!name) {
@@ -241,18 +246,25 @@ int ha_sbt::close() {
 int ha_sbt::write_row(uchar *buf) {
   DBUG_ENTER("ha_sbt::write_row");
   
+  // Force log output to error log
+  sql_print_information("=== SBT WRITE_ROW CALLED ===");
+  sbt_log_debug("=== WRITE_ROW CALLED ===");
+  
   // Validate handler state
   if (!share || !share->get_tree()) {
+    sql_print_error("SBT: Invalid handler state for write_row operation");
     sbt_log_error("Invalid handler state for write_row operation");
     DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
   }
   
   // Validate input buffer
   if (!buf) {
+    sql_print_error("SBT: Invalid record buffer for write_row operation");
     sbt_log_error("Invalid record buffer for write_row operation");
     DBUG_RETURN(HA_ERR_WRONG_COMMAND);
   }
 
+  sql_print_information("SBT: Writing new record to SBT table");
   sbt_log_debug("Writing new record to SBT table");
 
   // Pack row data from MySQL format to SBT format
@@ -466,6 +478,13 @@ int ha_sbt::create(const char *name, TABLE *table_arg,
     DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
   }
   
+  // Close the file to ensure it's properly written to disk
+  error = file.close();
+  if (error != SBT_SUCCESS) {
+    sbt_log_error("Failed to close table file after creation: %s, error: %d", file_path, error);
+    DBUG_RETURN(sbt_error_to_mysql_error(static_cast<sbt_error_t>(error)));
+  }
+  
   sbt_log_info("Successfully created table file: %s", file_path);
   
   // Update status variable
@@ -507,6 +526,10 @@ int ha_sbt::delete_table(const char *name, const dd::Table *table_def) {
 /** External lock */
 int ha_sbt::external_lock(THD *thd, int lock_type) {
   DBUG_ENTER("ha_sbt::external_lock");
+  
+  sql_print_information("=== SBT EXTERNAL_LOCK CALLED with lock_type: %d ===", lock_type);
+  sbt_log_debug("=== EXTERNAL_LOCK CALLED with lock_type: %d ===", lock_type);
+  
   // Basic implementation - no special transaction handling needed
   DBUG_RETURN(0);
 }
