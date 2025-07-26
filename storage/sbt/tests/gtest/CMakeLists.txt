@@ -44,6 +44,7 @@ SET(SBT_TEST_SOURCES
   sbt_node_test.cc
   sbt_file_test.cc
   sbt_basic_test.cc
+  sbt_basic_functionality_test.cc
 )
 
 # Create test executable

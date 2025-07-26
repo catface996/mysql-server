@@ -88,6 +88,14 @@ test_resource_stress: test_resource_stress.cc $(SBT_SOURCES)
 test_raii_simple: test_raii_simple.cc
 	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^ -pthread
 
+# Task 8.1: Basic functionality tests (standalone)
+test_basic_functionality_standalone: test_basic_functionality_standalone.cc
+	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
+
+# Task 8.1: Basic functionality tests (simplified version)
+test_basic_functionality_simple: test_basic_functionality_simple.cc
+	$(CXX) -std=c++17 -g -O0 -Wall -Wextra -o $@ $^
+
 # Run all file format tests
 test-file-format: test_file_format comprehensive_file_format_test
 	@echo "=== Running Basic File Format Test ==="
@@ -120,7 +128,12 @@ test-exception-safety: test_exception_safety test_memory_leaks test_resource_str
 	@echo "=== Running Resource Management Stress Tests ==="
 	./test_resource_stress
 
-clean:
-	rm -f test_file_format comprehensive_file_format_test test_file_operations_standalone test_file_operations_simple test_file_basic test_sbt_share_standalone test_share_resource_management test_task_4_2_verification test_task_5_1_verification test_task_5_4_verification test_task_5_6_verification test_task_5_7_verification test_full_table_scan_standalone test_task_6_1_verification test_exception_safety test_memory_leaks test_resource_stress test_raii_simple
+# Run Task 8.1: Basic functionality tests
+test-basic-functionality: test_basic_functionality_simple
+	@echo "=== Running Task 8.1: Basic Functionality Tests (Simplified) ==="
+	./test_basic_functionality_simple
 
-.PHONY: clean test-file-format test-file-operations test-share-management test-exception-safety
+clean:
+	rm -f test_file_format comprehensive_file_format_test test_file_operations_standalone test_file_operations_simple test_file_basic test_sbt_share_standalone test_share_resource_management test_task_4_2_verification test_task_5_1_verification test_task_5_4_verification test_task_5_6_verification test_task_5_7_verification test_full_table_scan_standalone test_task_6_1_verification test_exception_safety test_memory_leaks test_resource_stress test_raii_simple test_basic_functionality_standalone test_basic_functionality_simple
+
+.PHONY: clean test-file-format test-file-operations test-share-management test-exception-safety test-basic-functionality
